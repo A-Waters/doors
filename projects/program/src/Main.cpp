@@ -1,6 +1,7 @@
-#include "lib/Lib.hpp"
+#include "lib/Lib.h"
+
 
 int main(int, char**) {
-    lib::peek();
+    lib::windowManager();
     return 0;
 }
