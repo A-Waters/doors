@@ -45,7 +45,7 @@ namespace lib {
                 std::cout << "windowHandle: " << windowHandle << " | GetLastError: " << error << " | windowTitle: " << windowTitle << std::endl;
             }
             // std::cout << "windowHandle: " << windowHandle << " | windowTitle.compare(Settings): " << (windowTitle != "Settings") << " | windowTitle: " << windowTitle << std::endl;
-            if (windowTitle != "Settings" && windowTitle != "Program Manager" && processId != 13988) {
+            if (windowTitle != "Settings" && windowTitle != "Program Manager" && processId != 13988 && windowTitle != "Widgits") {
                 wmptr->_addWindowToWM(windowHandle, windowTitle, processId);
             }
         }   
@@ -140,8 +140,7 @@ namespace lib {
             }
         }
 
-        // Ensure that all windows are matched to their new regions
-        matchWindowsToRegions();
+        // Ensure that all windows are matched to their new region
 
         return true;
     }
@@ -159,6 +158,36 @@ namespace lib {
 
     bool doorsWindowManager::matchWindowsToRegions()
     {
+        // update locations
+        int monitorsSize = this->mActiveMonitors.size();
+
+        for (DoorMonitorInfo* monitor : this->mActiveMonitors) {
+            // std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~"  << monitor->mMonitorHandle << std::endl;
+            std::vector<Region*> onMonitorRegions = this->mRegions[monitor->mMonitorHandle];
+
+            if (onMonitorRegions.size() != 0) {
+                
+                int workAreaWidth = monitor->mMonitorInfo.rcWork.right - monitor->mMonitorInfo.rcWork.left;
+                int workAreaHeight = monitor->mMonitorInfo.rcWork.bottom - monitor->mMonitorInfo.rcWork.top;
+
+                int workAreaX = monitor->mMonitorInfo.rcWork.left;
+                int workAreaY = monitor->mMonitorInfo.rcWork.top;
+                int WidthPerRegion = workAreaWidth / onMonitorRegions.size();
+                int regionsPlaced = 0;
+                for (Region* region : onMonitorRegions) {
+                    region->mWidth = WidthPerRegion - this->gaps;
+                    region->mHeight = workAreaHeight - this->gaps;
+                    region->mX = (workAreaX + this->gaps) + (WidthPerRegion * regionsPlaced);
+                    region->mY = workAreaY + this->gaps;
+                    regionsPlaced += 1;
+                }
+            }
+            else {
+                std::cout << "no regions on montitor" << monitor->mMonitorHandle << std::endl;
+            }
+            
+        }
+        // move items 
         for (const auto& pair : this->mRegions) {
             std::vector<Region*> regionsForWindow = pair.second;
             for (Region* region : regionsForWindow) {
@@ -198,8 +227,11 @@ namespace lib {
         this->printInfo();   
         this->moveMouse(100, 100);
         this->buildRegions();
-        // printf("====================== waiting ===================== \n");
-        // Sleep(3000);
+        matchWindowsToRegions();
+        printf("====================== waiting ===================== \n");
+        Sleep(3000);
+        matchWindowsToRegions();
+        this->printInfo();
 
         // this->swapRegionsByID(3, 4);
     }
@@ -207,6 +239,9 @@ namespace lib {
     doorsWindowManager::~doorsWindowManager()
     {
         for (auto monitor : this->mActiveMonitors) {
+            for (Region* region : this->mRegions[monitor->mMonitorHandle]) {
+                delete region;
+            }
             delete monitor;
         }
 
@@ -257,7 +292,12 @@ namespace lib {
     bool doorsWindowManager::focusRegion(Region* regionToFocus)
     {
         SetFocus(regionToFocus->DWI->hwnd);
-        return false;
+        DWORD error = GetLastError();
+        if (error) {
+            return false;
+        }
+        this->mFocused = regionToFocus;
+        return true;
     }
 
     bool doorsWindowManager::swapRegionsByID(int regionAid, int regionBid)
@@ -302,27 +342,119 @@ namespace lib {
         return true;
     }
 
+    bool doorsWindowManager::createRegion(HMONITOR monitor, int x, int y, int length, int height, DoorWindowInfo* dwi)
+    {
+        Region* region = new Region(x, y, length, height);
+        region->id = this->mRegions.size();
+        region->DWI = dwi;
+        this->mRegions[monitor].push_back(region);
+
+        return true;
+    }
+
+    bool doorsWindowManager::deleteRegion(HMONITOR monitor, Region* regionToRemove)
+    {
+        // Get the vector of regions from the 'from' monitor
+        std::vector<Region*>& monitorRegions = this->mRegions[monitor];
+
+        // Iterate through the regions in 'fromMonitor'
+        auto foudnRegion = std::find(monitorRegions.begin(), monitorRegions.end(), regionToRemove);
+
+        // If region is found
+        if (foudnRegion != monitorRegions.end()) {
+            // Remove the region from the 'fromMonitor' vector
+            monitorRegions.erase(foudnRegion);
+
+            return true;
+        }
+
+        return false;
+    }
+
+    bool doorsWindowManager::moveRegion(HMONITOR from, HMONITOR to, Region* regionToMove) {
+        // Check if the region is valid
+        if (regionToMove == nullptr) {
+            std::cout << "Error: regionToMove is null!" << std::endl;
+            return false;
+        }
+
+        if (regionToMove->DWI == nullptr) {
+            std::cout << "Error: DWI is null for region " << regionToMove->id << std::endl;
+            return false;
+        }
+
+        // Safe logging if DWI is valid
+        std::cout << "Moving region " << regionToMove->id << " (" << regionToMove->DWI->title.c_str() << ") from monitor " << from << " to monitor " << to << std::endl;
+
+        // Check if the 'from' and 'to' monitors exist in the map
+        auto fromIt = this->mRegions.find(from);
+        auto toIt = this->mRegions.find(to);
+
+        if (fromIt == this->mRegions.end()) {
+            std::cout << "Error: 'from' monitor " << from << " does not exist in mRegions!" << std::endl;
+            return false;
+        }
+
+        if (toIt == this->mRegions.end()) {
+            std::cout << "Error: 'to' monitor " << to << " does not exist in mRegions!" << std::endl;
+            return false;
+        }
+
+        std::vector<Region*>& fromMonitor = fromIt->second;
+        std::vector<Region*>& toMonitor = toIt->second;
+        
+        if (fromMonitor.empty()) {
+            std::cout << "No regions to move from monitor " << from << std::endl;
+            return false;
+        }
+
+        // Find the region in the 'fromMonitor' vector
+        auto foundRegion = std::find(fromMonitor.begin(), fromMonitor.end(), regionToMove);
+
+        if (foundRegion != fromMonitor.end()) {
+            // Remove the region from the 'fromMonitor' vector
+            fromMonitor.erase(foundRegion);
+
+            // Add the region to the 'toMonitor' vector
+            toMonitor.push_back(regionToMove);
+
+            std::cout << "Successfully moved region " << regionToMove->id << " to monitor " << to << std::endl;
+            return true; // Return true to indicate success
+        }
+        else {
+            std::cout << "Failed to find region " << regionToMove->id << " on monitor " << from << std::endl;
+            return false; // Return false if the region wasn't found
+        }
+    }
+
+
     // Method to print out all windows stored
     void doorsWindowManager::printInfo() const {        
         std::cout << "Is Admin?: " << (this->mIsAdmin ? "yes" : "no") << std::endl;
 
-        std::cout << "Windows enumerated:" << std::endl;
-        for (DoorWindowInfo* window : this->mActiveWindows) {
-            std::cout << window->hwnd << ": " << window->title << " --- pid:"<< window->lpdwProcessId << std::endl;
-        }
-
-        /*
+        std::cout << "---------------------------------INFO---------------------------------" << std::endl;
         for (DoorMonitorInfo* monitor : this->mActiveMonitors) {
-            std::cout << monitor->mMonitorHandle << std::endl;
-            // Successfully retrieved monitor info
-            std::cout << "Monitor Rectangle: (" << monitor->mMonitorInfo.rcMonitor.left << ", "
-                << monitor->mMonitorInfo.rcMonitor.top << ") to (" << monitor->mMonitorInfo.rcMonitor.right << ", "
-                << monitor->mMonitorInfo.rcMonitor.bottom << ")\n";
-            std::cout << "Work Area Rectangle: (" << monitor->mMonitorInfo.rcWork.left << ", "
-                << monitor->mMonitorInfo.rcWork.top << ") to (" << monitor->mMonitorInfo.rcWork.right << ", "
-                << monitor->mMonitorInfo.rcWork.bottom << ")\n";
-        }*/
-        
+            std::cout << "================= " << monitor->mMonitorHandle << " =================" << std::endl;
+            HMONITOR mhand = monitor->mMonitorHandle;
+
+            // Safely find monitor regions for this monitor handle
+            auto it = this->mRegions.find(mhand);
+            if (it != this->mRegions.end()) {
+                for (Region* region : it->second) {
+                    if (region->DWI != nullptr) {
+                        std::cout << "Window: " << region->DWI->title << " - Location: ("
+                            << region->mX << ", " << region->mY << ") - Size: ("
+                            << region->mWidth << ", " << region->mHeight << ")" << std::endl;
+                    }
+                    else {
+                        std::cout << "Region " << region->id << " has no associated DoorWindowInfo." << std::endl;
+                    }
+                }
+            }
+            else {
+                std::cout << "No regions found for monitor handle " << mhand << std::endl;
+            }
+        }
     }
 
     bool doorsWindowManager::moveWindow(HWND hwnd, int x, int y, int width, int height)

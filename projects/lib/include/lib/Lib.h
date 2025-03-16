@@ -56,14 +56,16 @@ namespace lib {
         void printInfo() const;
         bool moveWindow(HWND hwnd, int x, int y, int width, int height);
         bool moveMouse(int x, int y);
-        bool _addWindowToWM(HWND hWnd, const std::string& title, DWORD lpdwProcessId);
+        bool _addWindowToWM(HWND hwnd, const std::string& title, DWORD lpdwProcessId);
         bool _addMonitorToWM(HMONITOR monitorHandle, HDC deviceContextHandle, LPRECT cords);
-        bool focusRegion(Region* regionToFocus);
         bool swapRegionsByID(int regionAid, int regionBid);
-        
         bool swapRegions(Region* regionA, Region* regionB);
+        bool createRegion(HMONITOR monitor, int x, int y, int length, int height, DoorWindowInfo* dwi);
+        bool deleteRegion(HMONITOR monitor, Region* regionToRemove);
+        bool moveRegion(HMONITOR from, HMONITOR to, Region* regionToMove);
 
     private:
+        Region* mFocused;
         int gaps = 0;
         std::vector <DoorWindowInfo*> mActiveWindows;
         std::vector <DoorMonitorInfo*> mActiveMonitors;
@@ -77,6 +79,7 @@ namespace lib {
         DoorMonitorInfo* getMonitorInfoFromHandle(HMONITOR monitorHandle);
         bool matchWindowsToRegions();
         Region* getRegionsByID(int regionAid);
+        bool focusRegion(Region* regionToFocus);
 
     };
     

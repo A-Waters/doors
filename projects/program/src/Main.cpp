@@ -10,5 +10,6 @@ int main(int, char**) {
 
     getline(std::cin, userInput);
     std::flush(std::cout);
+
     return 0;
 }
