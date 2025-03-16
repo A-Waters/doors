@@ -31,13 +31,14 @@ namespace lib {
     };
 
     struct Region {
+        int id;
         int mX;
         int mY;
         int mWidth;
         int mHeight;
         DoorWindowInfo* DWI; 
 
-        Region(int x, int y, int width, int height) : mX(x), mY(y), mWidth(width), mHeight(height), DWI(nullptr) {};
+        Region(int x, int y, int width, int height) : mX(x), mY(y), mWidth(width), mHeight(height), DWI(nullptr), id(-1) {};
     };
 
 
@@ -57,10 +58,13 @@ namespace lib {
         bool moveMouse(int x, int y);
         bool _addWindowToWM(HWND hWnd, const std::string& title, DWORD lpdwProcessId);
         bool _addMonitorToWM(HMONITOR monitorHandle, HDC deviceContextHandle, LPRECT cords);
-        bool selectWindow(DWORD pid);
+        bool focusRegion(Region* regionToFocus);
+        bool swapRegionsByID(int regionAid, int regionBid);
+        
+        bool swapRegions(Region* regionA, Region* regionB);
 
     private:
-        int gaps = 15;
+        int gaps = 0;
         std::vector <DoorWindowInfo*> mActiveWindows;
         std::vector <DoorMonitorInfo*> mActiveMonitors;
         std::map<HMONITOR, std::vector<Region*>> mRegions;
@@ -72,7 +76,7 @@ namespace lib {
         bool buildRegions();
         DoorMonitorInfo* getMonitorInfoFromHandle(HMONITOR monitorHandle);
         bool matchWindowsToRegions();
-
+        Region* getRegionsByID(int regionAid);
 
     };
     

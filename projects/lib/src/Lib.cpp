@@ -6,17 +6,22 @@
 
 namespace lib {
 
-
-
-
-
-
     // Callback function to enumerate windows
     static BOOL CALLBACK enumWindowCallback(HWND windowHandle, LPARAM wm) {
         int length = GetWindowTextLength(windowHandle);
-        
+        // A pointer to a variable that receives the process identifier. 
+            // If this parameter is not NULL, GetWindowThreadProcessId copies the identifier of
+            // the process to the variable; otherwise, it does not. If the function fails, 
+            // the value of the variable is unchanged.
+        DWORD processId = 0;
+
+        // Declare a DWORD variable to store the process ID
+        DWORD threadId = GetWindowThreadProcessId(windowHandle, &processId);
+
+        printf("checking, %i \n", processId);
         // Add visible windows with non-empty title to the window manager
         if (IsWindowVisible(windowHandle) && length != 0) {
+            printf("inside this thiny for window, %i \n", processId);
             // Convert LPARAM into windowManger* (pointer to class instance)
             doorsWindowManager* wmptr = reinterpret_cast<doorsWindowManager*>(wm);
 
@@ -31,21 +36,16 @@ namespace lib {
             std::string windowTitle(your_wchar_in_char);
             delete[] buffer;
 
-            // A pointer to a variable that receives the process identifier. 
-            // If this parameter is not NULL, GetWindowThreadProcessId copies the identifier of
-            // the process to the variable; otherwise, it does not. If the function fails, 
-            // the value of the variable is unchanged.
-            DWORD processId = 0;
-            
-            // Declare a DWORD variable to store the process ID
-            DWORD threadId = GetWindowThreadProcessId(windowHandle, &processId);  // Pass the address of processId            
+            printf("window is %s \n", windowTitle.c_str());
+
+              // Pass the address of processId            
 
             DWORD error = GetLastError();
             if (error) {
                 std::cout << "windowHandle: " << windowHandle << " | GetLastError: " << error << " | windowTitle: " << windowTitle << std::endl;
             }
             // std::cout << "windowHandle: " << windowHandle << " | windowTitle.compare(Settings): " << (windowTitle != "Settings") << " | windowTitle: " << windowTitle << std::endl;
-            if (windowTitle != "Settings" && windowTitle != "Program Manager" && windowTitle != "program.exe") {
+            if (windowTitle != "Settings" && windowTitle != "Program Manager" && processId != 13988) {
                 wmptr->_addWindowToWM(windowHandle, windowTitle, processId);
             }
         }   
@@ -80,7 +80,7 @@ namespace lib {
 
     bool doorsWindowManager::buildRegions()
     {
-        // Get which windows are on what monitors
+        // Get which windows are on what monitors and create regions for each one
         for (DoorWindowInfo* DWIptr : mActiveWindows)
         {
             HMONITOR monitorHandle = MonitorFromWindow(DWIptr->hwnd, MONITOR_DEFAULTTONEAREST);
@@ -99,8 +99,8 @@ namespace lib {
                 this->mRegions[monitorHandle].push_back(newRegion);
             }
         }
-
-        // Create regions for each monitor
+        int setId = 0;
+        // set the region locations and ids
         for (const auto& pair : this->mRegions) {
 
             std::vector<Region*> regionsForMonitor = pair.second; // Get windows on this monitor
@@ -122,15 +122,18 @@ namespace lib {
             std::cout << "==================== Monitor : " << monitorHandle << " | Width : " << WidthPerRegion <<" | Windows: " << numberOfWindows <<" ===============\n";
             int regionsPlaced = 0;
             for (Region* curr : regionsForMonitor) {
-                regionsPlaced += 1;
-
+                
+                
+                curr->id = setId;
+                setId += 1;
                 curr->mWidth = WidthPerRegion - this->gaps;
                 curr->mHeight = workAreaHeight - this->gaps;
-                curr->mX = (workAreaX + this->gaps) + (WidthPerRegion * (regionsPlaced-1));
+                curr->mX = (workAreaX + this->gaps) + (WidthPerRegion * regionsPlaced);
                 curr->mY = workAreaY + this->gaps;
+                regionsPlaced += 1;
 
                 // Output for debugging
-                std::cout << curr->DWI->title << " : " << " [" << regionsPlaced << "] " << curr->mX << "x" << curr->mY << " " << curr->mWidth << "x" << curr->mHeight << std::endl;
+                std::cout << "BUILDING - " << curr->DWI->title << " : " << " [" << regionsPlaced << "] " << curr->mX << "x" << curr->mY << " " << curr->mWidth << "x" << curr->mHeight << std::endl;
 
                 // Move the window to its new position
                 // MoveWindow(curr->DWI->hwnd, curr->mX, curr->mY, curr->mWidth, curr->mHeight, TRUE);
@@ -159,8 +162,9 @@ namespace lib {
         for (const auto& pair : this->mRegions) {
             std::vector<Region*> regionsForWindow = pair.second;
             for (Region* region : regionsForWindow) {
-                std::cout << "moving " << region->DWI->title 
-                    << " to (" << region->mX
+                std::cout << "MOVING  " << region->DWI->title
+                    << " With ID [" << region->id
+                    << "] to (" << region->mX
                     << ", " << region->mY
                     << ") with size of (" 
                     << region->mWidth << ","
@@ -169,13 +173,15 @@ namespace lib {
                 // add a check to check if full screen or minmized and then undoit if requreid
                 // SetWindowLongPtr(region->DWI->hwnd, GWLP_WNDPROC, (LONG_PTR)WindowProc);
                 moveWindow(region->DWI->hwnd, region->mX, region->mY, region->mWidth, region->mHeight);
-                
-                // SetWindowPos(region->DWI->hwnd, nullptr, 0, 0, region->mWidth, region->mHeight, SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED);
-                ShowWindow(region->DWI->hwnd, SW_RESTORE);
+                DWORD err = GetLastError();
+                if (err) {
+                    printf("ERROR: %i \n", err);
+                }
+                //SetWindowPos(region->DWI->hwnd, nullptr, 0, 0, region->mWidth, region->mHeight, SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED);
+                // ShowWindow(region->DWI->hwnd, SW_RESTORE);
                 
             }
         };
-
         return true;
     }
 
@@ -192,6 +198,10 @@ namespace lib {
         this->printInfo();   
         this->moveMouse(100, 100);
         this->buildRegions();
+        // printf("====================== waiting ===================== \n");
+        // Sleep(3000);
+
+        // this->swapRegionsByID(3, 4);
     }
 
     doorsWindowManager::~doorsWindowManager()
@@ -244,17 +254,52 @@ namespace lib {
       return true;
     }
 
-    bool doorsWindowManager::selectWindow(DWORD pid)
+    bool doorsWindowManager::focusRegion(Region* regionToFocus)
     {
-        
-        for (DoorWindowInfo* DWI : this->mActiveWindows) {
-            if (DWI->lpdwProcessId == pid) {
-                MonitorFromWindow(DWI->hwnd, MONITOR_DEFAULTTONEAREST);
-            }
+        SetFocus(regionToFocus->DWI->hwnd);
+        return false;
+    }
 
+    bool doorsWindowManager::swapRegionsByID(int regionAid, int regionBid)
+    {
+        Region* regionA = getRegionsByID(regionAid); 
+        Region* regionB = getRegionsByID(regionBid);
+
+        if (regionA == nullptr || regionB == nullptr || regionA == regionB) {
+            printf("cant swap region with id %i with %i", regionAid, regionBid);
+        };
+
+        return swapRegions(regionA, regionB);
+    }
+
+    Region* doorsWindowManager::getRegionsByID(int regionID)
+    {
+
+        for (const auto& entry : mRegions) {
+            HMONITOR monitor = entry.first;  // This is the key (HMONITOR)
+            const std::vector<Region*>& regions = entry.second;  // This is the value (std::vector<Region*>)
+
+            // Perform an action with each monitor and its regions
+            std::cout << "Monitor: " << monitor << std::endl;
+
+            for (Region* region : regions) {
+                std::cout << "  Region ID: " << region->id << std::endl;
+                if (region->id == regionID) return region;
+            }
         }
 
-        return false;
+        return nullptr;
+    }
+
+    bool doorsWindowManager::swapRegions(Region* regionA, Region* regionB)
+    {
+        printf("SWAPPING %s and %s \n", regionA->DWI->title.c_str(), regionB->DWI->title.c_str());
+
+        DoorWindowInfo* temp = regionA->DWI;
+        regionA->DWI = regionB->DWI;
+        regionB->DWI = temp;
+        matchWindowsToRegions();
+        return true;
     }
 
     // Method to print out all windows stored
