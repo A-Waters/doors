@@ -7,10 +7,11 @@
 #include <map>
 
 
+HHOOK keyboardHook;
 
 
 namespace lib {
-
+    void handleKeyPress(int keyCode);
     struct DoorMonitorInfo
     {
         HMONITOR mMonitorHandle;

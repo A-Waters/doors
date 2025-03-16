@@ -6,6 +6,46 @@
 
 namespace lib {
 
+    LRESULT CALLBACK DoorsKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
+        if (nCode == HC_ACTION) {
+            KBDLLHOOKSTRUCT* pKeyBoard = (KBDLLHOOKSTRUCT*)lParam;
+
+            // Only process the key down event (when a key is pressed)
+            if (wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN) {
+                int keyCode = pKeyBoard->vkCode;
+
+                // Handle the key press based on the keyCode
+                handleKeyPress(keyCode);
+            }
+        }
+
+        return CallNextHookEx(keyboardHook, nCode, wParam, lParam);
+    }
+
+    void handleKeyPress(int keyCode) {
+        switch (keyCode) {
+        case VK_UP:
+            std::cout << "Up arrow key pressed." << std::endl;
+            // Add your custom logic to handle this key press here
+            break;
+        case VK_DOWN:
+            std::cout << "Down arrow key pressed." << std::endl;
+            // Add your custom logic to handle this key press here
+            break;
+        case 'A': // For letter 'A'
+            std::cout << "'A' key pressed." << std::endl;
+            // Add your custom logic to handle this key press here
+            break;
+        case 'B': // For letter 'B'
+            std::cout << "'B' key pressed." << std::endl;
+            // Add your custom logic to handle this key press here
+            break;
+        default:
+            std::cout << "Other key pressed: " << keyCode << std::endl;
+            break;
+        }
+    }
+
     // Callback function to enumerate windows
     static BOOL CALLBACK enumWindowCallback(HWND windowHandle, LPARAM wm) {
         int length = GetWindowTextLength(windowHandle);
@@ -221,6 +261,11 @@ namespace lib {
 
     // Constructor for windowManger
     doorsWindowManager::doorsWindowManager() {
+
+        keyboardHook = SetWindowsHookEx(WH_KEYBOARD_LL, DoorsKeyboardProc, NULL, 0);
+        if (keyboardHook == NULL) {
+            std::cerr << "Failed to install keyboard hook!" << std::endl;
+        }
         this->mIsAdmin = isRunningAsAdmin();
         this->loadWindowInfo();
         this->loadMonitorInfo();
@@ -232,7 +277,12 @@ namespace lib {
         Sleep(3000);
         matchWindowsToRegions();
         this->printInfo();
+        // Remove the keyboard hook
 
+        if (keyboardHook != NULL) {
+            UnhookWindowsHookEx(keyboardHook);
+            keyboardHook = NULL;
+        }
         // this->swapRegionsByID(3, 4);
     }
 
