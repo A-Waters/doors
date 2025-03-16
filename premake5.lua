@@ -8,7 +8,7 @@ DEP_DIR  = ROOT_PATH "dependencies"
 BIN_DIR  = ROOT_PATH "_out/bin/%{cfg.buildcfg}-%{cfg.platform}/%{prj.name}"
 OBJ_DIR  = ROOT_PATH "_out/obj/%{cfg.buildcfg}-%{cfg.platform}/%{prj.name}"
 
-WORKSPACE_NAME = "windowWM"
+WORKSPACE_NAME = "doors"
 START_PROJECT  = "user"
 
 include "workspace.lua"

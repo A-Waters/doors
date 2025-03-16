@@ -7,7 +7,8 @@ int main(int, char**) {
     std::cout << "all done";
     std::flush(std::cout);
     std::string userInput;
+
     getline(std::cin, userInput);
-    Sleep(1);
+    std::flush(std::cout);
     return 0;
 }

@@ -4,7 +4,7 @@
 #include <winnt.h>
 #include <iostream>
 #include <vector>
-
+#include <map>
 
 
 
@@ -30,6 +30,17 @@ namespace lib {
         DoorWindowInfo() : hwnd(0), title(""), lpdwProcessId(DWORD()) {};
     };
 
+    struct Region {
+        int mX;
+        int mY;
+        int mWidth;
+        int mHeight;
+        DoorWindowInfo* DWI; 
+
+        Region(int x, int y, int width, int height) : mX(x), mY(y), mWidth(width), mHeight(height), DWI(nullptr) {};
+    };
+
+
     static BOOL CALLBACK enumWindowCallback(HWND hWnd, LPARAM lparam);
     static BOOL CALLBACK enumMonitorCallback(HMONITOR monitorHandle, HDC deviceContextHandle, LPRECT cords, LPARAM);
 
@@ -37,19 +48,31 @@ namespace lib {
 
 
     class doorsWindowManager {
-        std::vector <DoorWindowInfo*> mActiveWindows;
-        std::vector <DoorMonitorInfo*> mActiveMonitors;
+
     public:
         doorsWindowManager();
         ~doorsWindowManager();
-        void printWindows() const;
+        void printInfo() const;
         bool moveWindow(HWND hwnd, int x, int y, int width, int height);
+        bool moveMouse(int x, int y);
         bool _addWindowToWM(HWND hWnd, const std::string& title, DWORD lpdwProcessId);
         bool _addMonitorToWM(HMONITOR monitorHandle, HDC deviceContextHandle, LPRECT cords);
+        bool selectWindow(DWORD pid);
 
-    private:    
+    private:
+        int gaps = 15;
+        std::vector <DoorWindowInfo*> mActiveWindows;
+        std::vector <DoorMonitorInfo*> mActiveMonitors;
+        std::map<HMONITOR, std::vector<Region*>> mRegions;
+
+        bool mIsAdmin;
         bool loadMonitorInfo();
         bool loadWindowInfo();
+        bool isRunningAsAdmin();
+        bool buildRegions();
+        DoorMonitorInfo* getMonitorInfoFromHandle(HMONITOR monitorHandle);
+        bool matchWindowsToRegions();
+
 
     };
     
