@@ -7,11 +7,24 @@
 #include <map>
 
 
-HHOOK keyboardHook;
 
 
 namespace lib {
-    void handleKeyPress(int keyCode);
+   
+
+
+    enum WindowType {
+        TopLevel,
+        Child,
+        Popup,
+        Dialog,
+        ToolWindow,
+        dMessageBox,
+        Overlay,
+        Invisible,
+        Unknown
+    };
+
     struct DoorMonitorInfo
     {
         HMONITOR mMonitorHandle;
@@ -22,13 +35,13 @@ namespace lib {
         DoorMonitorInfo() : mMonitorHandle(0), mDeviceContextHandle(0), mCords(0), mMonitorInfo(tagMONITORINFO()) {} // weird but it works
     };
 
-
     struct DoorWindowInfo {
         HWND hwnd;
         std::string title;
         DWORD lpdwProcessId; // will be 0 if not running as admin or sudo
+        MINMAXINFO minSizes;
 
-        DoorWindowInfo() : hwnd(0), title(""), lpdwProcessId(DWORD()) {};
+        DoorWindowInfo() : hwnd(0), title(""), lpdwProcessId(DWORD()), minSizes() {};
     };
 
     struct Region {
@@ -78,9 +91,13 @@ namespace lib {
         bool isRunningAsAdmin();
         bool buildRegions();
         DoorMonitorInfo* getMonitorInfoFromHandle(HMONITOR monitorHandle);
+        std::vector<Region*> calulateRegionForMonitor(DoorMonitorInfo* monitor);
         bool matchWindowsToRegions();
         Region* getRegionsByID(int regionAid);
         bool focusRegion(Region* regionToFocus);
+        MINMAXINFO getMinSize(HWND hwnd);
+
+        WindowType GetWindowType(HWND hwnd);
 
     };
     

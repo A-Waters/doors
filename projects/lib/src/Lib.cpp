@@ -1,4 +1,5 @@
 #include "Lib.h"
+using namespace std;
 
 
 
@@ -6,45 +7,8 @@
 
 namespace lib {
 
-    LRESULT CALLBACK DoorsKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
-        if (nCode == HC_ACTION) {
-            KBDLLHOOKSTRUCT* pKeyBoard = (KBDLLHOOKSTRUCT*)lParam;
 
-            // Only process the key down event (when a key is pressed)
-            if (wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN) {
-                int keyCode = pKeyBoard->vkCode;
-
-                // Handle the key press based on the keyCode
-                handleKeyPress(keyCode);
-            }
-        }
-
-        return CallNextHookEx(keyboardHook, nCode, wParam, lParam);
-    }
-
-    void handleKeyPress(int keyCode) {
-        switch (keyCode) {
-        case VK_UP:
-            std::cout << "Up arrow key pressed." << std::endl;
-            // Add your custom logic to handle this key press here
-            break;
-        case VK_DOWN:
-            std::cout << "Down arrow key pressed." << std::endl;
-            // Add your custom logic to handle this key press here
-            break;
-        case 'A': // For letter 'A'
-            std::cout << "'A' key pressed." << std::endl;
-            // Add your custom logic to handle this key press here
-            break;
-        case 'B': // For letter 'B'
-            std::cout << "'B' key pressed." << std::endl;
-            // Add your custom logic to handle this key press here
-            break;
-        default:
-            std::cout << "Other key pressed: " << keyCode << std::endl;
-            break;
-        }
-    }
+   
 
     // Callback function to enumerate windows
     static BOOL CALLBACK enumWindowCallback(HWND windowHandle, LPARAM wm) {
@@ -58,7 +22,6 @@ namespace lib {
         // Declare a DWORD variable to store the process ID
         DWORD threadId = GetWindowThreadProcessId(windowHandle, &processId);
 
-        printf("checking, %i \n", processId);
         // Add visible windows with non-empty title to the window manager
         if (IsWindowVisible(windowHandle) && length != 0) {
             printf("inside this thiny for window, %i \n", processId);
@@ -69,6 +32,7 @@ namespace lib {
             wchar_t* buffer = new wchar_t[length + 1];
             GetWindowText(windowHandle, buffer, length + 1);
 
+            // https://stackoverflow.com/questions/3019977/convert-wchar-t-to-char
             std::wstring your_wchar_in_ws(buffer);
             std::string your_wchar_in_str(your_wchar_in_ws.begin(), your_wchar_in_ws.end());
             const char* your_wchar_in_char = your_wchar_in_str.c_str();
@@ -82,12 +46,12 @@ namespace lib {
 
             DWORD error = GetLastError();
             if (error) {
-                std::cout << "windowHandle: " << windowHandle << " | GetLastError: " << error << " | windowTitle: " << windowTitle << std::endl;
+                std::cout << "[ERROR] windowHandle: " << windowHandle << " | GetLastError: " << error << " | windowTitle: " << windowTitle << std::endl;
             }
-            // std::cout << "windowHandle: " << windowHandle << " | windowTitle.compare(Settings): " << (windowTitle != "Settings") << " | windowTitle: " << windowTitle << std::endl;
-            if (windowTitle != "Settings" && windowTitle != "Program Manager" && processId != 13988 && windowTitle != "Widgits") {
+            else {
                 wmptr->_addWindowToWM(windowHandle, windowTitle, processId);
             }
+            // std::cout << "windowHandle: " << windowHandle << " | windowTitle.compare(Settings): " << (windowTitle != "Settings") << " | windowTitle: " << windowTitle << std::end
         }   
 
         return TRUE;
@@ -129,6 +93,7 @@ namespace lib {
                 std::vector<Region*> newMonitors;
                 Region* newRegion = new Region(0, 0, 0, 0);
                 newRegion->DWI = DWIptr;
+                newRegion->DWI->minSizes = getMinSize(DWIptr->hwnd);
                 newMonitors.push_back(newRegion);
                 this->mRegions[monitorHandle] = newMonitors;
             }
@@ -136,6 +101,7 @@ namespace lib {
                 // If monitor already has a vector, add the new window
                 Region* newRegion = new Region(0, 0, 0, 0);
                 newRegion->DWI = DWIptr;
+                newRegion->DWI->minSizes = getMinSize(DWIptr->hwnd);
                 this->mRegions[monitorHandle].push_back(newRegion);
             }
         }
@@ -154,29 +120,68 @@ namespace lib {
             int workAreaY = monitor->mMonitorInfo.rcWork.top;
 
             size_t numberOfWindows = regionsForMonitor.size();
+            int totalMinWidth = 0;
 
-            // Ensure no division by zero or odd behavior
-            int WidthPerRegion = workAreaWidth / numberOfWindows;
+            // Calculate the total minimum width required for all windows
+            for (Region* region : regionsForMonitor) {
+                totalMinWidth += region->DWI->minSizes.ptMinTrackSize.x;
+                std::cout << region->DWI->title << " | Minimum Track Size: "
+                    << region->DWI->minSizes.ptMinTrackSize.x << "x"
+                    << region->DWI->minSizes.ptMinTrackSize.y << std::endl;
+            }
 
+            // Calculate the total gaps between the regions
+            int totalGaps = (this->gaps * numberOfWindows) + this->gaps;
 
-            std::cout << "==================== Monitor : " << monitorHandle << " | Width : " << WidthPerRegion <<" | Windows: " << numberOfWindows <<" ===============\n";
+            // Check if the total minimum width exceeds the available width after considering gaps
+            int availableWidth = workAreaWidth - totalMinWidth - totalGaps;
+
+            if (availableWidth < 0) {
+                std::cout << "Total minimum width exceeds available space. Need to handle this!" << std::endl;
+                // Handle scaling or stacking if the total minimum width exceeds available space
+                // For now, you could potentially handle this by stacking the windows vertically
+                // or scaling them down to fit
+                availableWidth = 0;  // No extra space, all windows will take their minimum width
+            }
+
+            // Now we calculate the width per region, ensuring it doesn't exceed the available space
+            int widthPerRegion = (availableWidth / numberOfWindows);
+
+            std::cout << "Available width for regions: " << availableWidth
+                << " | Width per region: " << widthPerRegion << std::endl;
+
+            // Now we need to place each region
             int regionsPlaced = 0;
-            for (Region* curr : regionsForMonitor) {
-                
-                
-                curr->id = setId;
-                setId += 1;
-                curr->mWidth = WidthPerRegion - this->gaps;
-                curr->mHeight = workAreaHeight - this->gaps;
-                curr->mX = (workAreaX + this->gaps) + (WidthPerRegion * regionsPlaced);
-                curr->mY = workAreaY + this->gaps;
+            int setId = 0; // Initialize setId if not set elsewhere
+
+            // Track the position of the last placed region
+            int lastPlacedX = workAreaX + this->gaps;  // Start at the work area X with initial gap
+            int lastPlacedY = workAreaY + this->gaps;  // Start at the work area Y with initial gap
+
+            for (Region* region : regionsForMonitor) {
+                // Ensure the region’s width respects its minimum size
+                region->id = setId;
+                region->mWidth = max(widthPerRegion, region->DWI->minSizes.ptMinTrackSize.x);
+                region->mHeight = workAreaHeight - this->gaps;
+
+                // Position the region based on the last placed region
+                region->mX = lastPlacedX;
+                region->mY = lastPlacedY;
+
+                // Update lastPlacedX for the next region
+                lastPlacedX = region->mX + region->mWidth + this->gaps;  // Move to the next position after the current region
+
                 regionsPlaced += 1;
+                setId += 1;
 
                 // Output for debugging
-                std::cout << "BUILDING - " << curr->DWI->title << " : " << " [" << regionsPlaced << "] " << curr->mX << "x" << curr->mY << " " << curr->mWidth << "x" << curr->mHeight << std::endl;
+                std::cout << "BUILDING - " << region->DWI->title << " : "
+                    << " [" << regionsPlaced << "] "
+                    << region->mX << "x" << region->mY << " "
+                    << region->mWidth << "x" << region->mHeight << std::endl;
 
                 // Move the window to its new position
-                // MoveWindow(curr->DWI->hwnd, curr->mX, curr->mY, curr->mWidth, curr->mHeight, TRUE);
+                // MoveWindow(region->DWI->hwnd, region->mX, region->mY, region->mWidth, region->mHeight, TRUE);
             }
         }
 
@@ -196,29 +201,93 @@ namespace lib {
         return nullptr; // or handle the case when the monitor isn't found
     }
 
+    // returns regions which can not fit on screen
+    std::vector<Region*> doorsWindowManager::calulateRegionForMonitor(DoorMonitorInfo* monitor) {
+
+        std::vector<Region*> removedRegions;
+
+        std::vector<Region*> regions = this->mRegions[monitor->mMonitorHandle];
+
+        if (regions.size() <= 0) {
+            return removedRegions;
+        }
+
+        // Work area (excluding taskbar)
+        int workAreaWidth = monitor->mMonitorInfo.rcWork.right - monitor->mMonitorInfo.rcWork.left;
+        int workAreaHeight = monitor->mMonitorInfo.rcWork.bottom - monitor->mMonitorInfo.rcWork.top;
+        int workAreaX = monitor->mMonitorInfo.rcWork.left;
+        int workAreaY = monitor->mMonitorInfo.rcWork.top;
+
+        int totalMinWidth = 0;
+        for (Region* region : regions) {
+            totalMinWidth += region->DWI->minSizes.ptMinTrackSize.x;
+        }
+
+        if (totalMinWidth > workAreaWidth) {
+            printf("too big");
+            // TODO
+            // future alex issue
+        }
+        
+        int widthPerRegion = (workAreaWidth - totalMinWidth) / regions.size();
+
+        int lastPlacedRegionWidth = 0;
+        int lastPlacedRegionX = 0;
+
+        for (Region * region : regions) {
+            region->mX = lastPlacedRegionX + lastPlacedRegionWidth + this->gaps;
+            region->mY = workAreaY;
+
+            region->mWidth = max(region->DWI->minSizes.ptMinTrackSize.x, totalMinWidth);
+            region->mHeight = workAreaHeight;
+        }
+
+        return removedRegions;
+    }
+
+
     bool doorsWindowManager::matchWindowsToRegions()
     {
         // update locations
         int monitorsSize = this->mActiveMonitors.size();
 
         for (DoorMonitorInfo* monitor : this->mActiveMonitors) {
-            // std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~"  << monitor->mMonitorHandle << std::endl;
+           
             std::vector<Region*> onMonitorRegions = this->mRegions[monitor->mMonitorHandle];
+
+
 
             if (onMonitorRegions.size() != 0) {
                 
+
+
+
                 int workAreaWidth = monitor->mMonitorInfo.rcWork.right - monitor->mMonitorInfo.rcWork.left;
                 int workAreaHeight = monitor->mMonitorInfo.rcWork.bottom - monitor->mMonitorInfo.rcWork.top;
 
                 int workAreaX = monitor->mMonitorInfo.rcWork.left;
                 int workAreaY = monitor->mMonitorInfo.rcWork.top;
-                int WidthPerRegion = workAreaWidth / onMonitorRegions.size();
+                
+                
+                int widthPerRegion = workAreaWidth / onMonitorRegions.size();
                 int regionsPlaced = 0;
+                
+                // Track the position of the last placed region
+                int lastPlacedX = workAreaX + this->gaps;  // Start at the work area X with initial gap
+                int lastPlacedY = workAreaY + this->gaps;  // Start at the work area Y with initial gap
+    
                 for (Region* region : onMonitorRegions) {
-                    region->mWidth = WidthPerRegion - this->gaps;
+                    region->mWidth = max(widthPerRegion, region->DWI->minSizes.ptMinTrackSize.x);
                     region->mHeight = workAreaHeight - this->gaps;
-                    region->mX = (workAreaX + this->gaps) + (WidthPerRegion * regionsPlaced);
-                    region->mY = workAreaY + this->gaps;
+
+                    // Position the region based on the last placed region
+                    region->mX = lastPlacedX;
+                    region->mY = lastPlacedY;
+
+                    // Update lastPlacedX for the next region
+                    lastPlacedX = region->mX + region->mWidth + this->gaps;  // Move to the next position after the current region
+
+                    regionsPlaced += 1;
                     regionsPlaced += 1;
                 }
             }
@@ -262,10 +331,7 @@ namespace lib {
     // Constructor for windowManger
     doorsWindowManager::doorsWindowManager() {
 
-        keyboardHook = SetWindowsHookEx(WH_KEYBOARD_LL, DoorsKeyboardProc, NULL, 0);
-        if (keyboardHook == NULL) {
-            std::cerr << "Failed to install keyboard hook!" << std::endl;
-        }
+
         this->mIsAdmin = isRunningAsAdmin();
         this->loadWindowInfo();
         this->loadMonitorInfo();
@@ -279,10 +345,7 @@ namespace lib {
         this->printInfo();
         // Remove the keyboard hook
 
-        if (keyboardHook != NULL) {
-            UnhookWindowsHookEx(keyboardHook);
-            keyboardHook = NULL;
-        }
+
         // this->swapRegionsByID(3, 4);
     }
 
@@ -314,12 +377,17 @@ namespace lib {
     // Method to add a window to the member list
     bool doorsWindowManager::_addWindowToWM(HWND fhwid, const std::string& ftitle, DWORD flpdwProcessId) {
 
-        DoorWindowInfo* DWI = new DoorWindowInfo();
-        DWI->hwnd = fhwid;
-        DWI->title = ftitle;
-        DWI->lpdwProcessId = flpdwProcessId;
-        this->mActiveWindows.push_back(DWI);
-        return true;
+        WindowType wt = GetWindowType(fhwid);
+        
+        // why is everything i care about unkown? 
+        if (wt == WindowType::Unknown) {
+            DoorWindowInfo* DWI = new DoorWindowInfo();
+            DWI->hwnd = fhwid;
+            DWI->title = ftitle;
+            DWI->lpdwProcessId = flpdwProcessId;
+            this->mActiveWindows.push_back(DWI);
+            return true;
+        }
     }
 
     bool doorsWindowManager::_addMonitorToWM(HMONITOR monitorHandle, HDC deviceContextHandle, LPRECT cords) {
@@ -348,6 +416,105 @@ namespace lib {
         }
         this->mFocused = regionToFocus;
         return true;
+    }
+
+    MINMAXINFO doorsWindowManager::getMinSize(HWND hwnd)
+    {
+        MINMAXINFO minMaxInfo;
+        // Send the WM_GETMINMAXINFO message to the window to retrieve the min size
+        SendMessage(hwnd, WM_GETMINMAXINFO, 0, (LPARAM)&minMaxInfo);
+
+        std::cout << minMaxInfo.ptMinTrackSize.x << std::endl;
+        std::cout << minMaxInfo.ptMinTrackSize.y << std::endl;
+        // check for bad numbers i.e. -858993460
+        if (minMaxInfo.ptMinTrackSize.x > 2000) {
+            minMaxInfo.ptMinTrackSize.x = 2000;
+        }
+        if (minMaxInfo.ptMinTrackSize.x < 0) {
+            minMaxInfo.ptMinTrackSize.x = 0;
+        }
+        if (minMaxInfo.ptMinTrackSize.y > 2000) {
+            minMaxInfo.ptMinTrackSize.y = 2000;
+        }
+        if (minMaxInfo.ptMinTrackSize.y < 1000) {
+            minMaxInfo.ptMinTrackSize.y = 0;
+        }
+
+        if (minMaxInfo.ptMaxTrackSize.x > 2000) {
+            minMaxInfo.ptMaxTrackSize.x = 2000;
+        }
+        if (minMaxInfo.ptMaxTrackSize.x < 0) {
+            minMaxInfo.ptMaxTrackSize.x = 0;
+        }
+        if (minMaxInfo.ptMaxTrackSize.y > 2000) {
+            minMaxInfo.ptMaxTrackSize.y = 2000;
+        }
+        if (minMaxInfo.ptMaxTrackSize.y < 1000) {
+            minMaxInfo.ptMaxTrackSize.y = 0;
+        }
+
+        return minMaxInfo;
+    }
+
+    WindowType doorsWindowManager::GetWindowType(HWND hwnd)
+    {
+        // Retrieve window styles
+        DWORD dwStyle = GetWindowLong(hwnd, GWL_STYLE);
+        DWORD dwExStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
+
+        // Check for Popup Window (usually has WS_POPUP style)
+        if (dwStyle & WS_POPUP) {
+            return Popup;
+        }
+
+        std::cout << "Style = " << dwStyle << " Exstyle = " << dwExStyle << std::endl;
+        // Check for a MessageBox - These are special modal windows
+        // You could also check if the window is a child of the MessageBox class
+        wchar_t className[512];
+        GetClassName(hwnd, className, sizeof(className));
+
+        // https://stackoverflow.com/questions/3019977/convert-wchar-t-to-char
+        std::wstring your_wchar_in_ws(className);
+        std::string your_wchar_in_str(your_wchar_in_ws.begin(), your_wchar_in_ws.end());
+        const char* your_wchar_in_char = your_wchar_in_str.c_str();
+
+
+        if (strcmp(your_wchar_in_char, "#32770") == 0) { // The class name for MessageBox is "#32770"
+            return WindowType::dMessageBox;
+        }
+
+        // Check for Dialog Window (typically windows created using CreateDialog or CreateDialogParam)
+        if (dwExStyle & WS_EX_DLGMODALFRAME) {
+            return WindowType::Dialog;
+        }
+
+        // Check for Tool Window (typically has WS_EX_TOOLWINDOW style)
+        if (dwExStyle & WS_EX_TOOLWINDOW) {
+            return WindowType::ToolWindow;
+        }
+
+        // Check for a Child Window (has WS_CHILD style)
+        if (dwStyle & WS_CHILD) {
+            return WindowType::Child;
+        }
+
+        // Check for Overlay Window (layered window, which typically uses WS_EX_LAYERED)
+        if (dwExStyle & WS_EX_LAYERED) {
+            return WindowType::Overlay;
+        }
+
+        // Check for Invisible Window (this could mean no visible styles or transparency, or minimized window)
+        if (dwStyle & WS_MINIMIZE) {
+            return WindowType::Invisible;
+        }
+
+        // If it's not a special type, we assume it's a Top-Level Window
+        if (dwExStyle & WS_EX_TOPMOST) {
+            return WindowType::TopLevel; // Could be a top-level window with specific attributes
+        }
+
+        // Default to Unknown if no criteria matched
+        return WindowType::Unknown;
     }
 
     bool doorsWindowManager::swapRegionsByID(int regionAid, int regionBid)
@@ -480,9 +647,10 @@ namespace lib {
 
     // Method to print out all windows stored
     void doorsWindowManager::printInfo() const {        
-        std::cout << "Is Admin?: " << (this->mIsAdmin ? "yes" : "no") << std::endl;
+
 
         std::cout << "---------------------------------INFO---------------------------------" << std::endl;
+        std::cout << "Is Admin?: " << (this->mIsAdmin ? "yes" : "no") << std::endl;
         for (DoorMonitorInfo* monitor : this->mActiveMonitors) {
             std::cout << "================= " << monitor->mMonitorHandle << " =================" << std::endl;
             HMONITOR mhand = monitor->mMonitorHandle;
@@ -505,6 +673,8 @@ namespace lib {
                 std::cout << "No regions found for monitor handle " << mhand << std::endl;
             }
         }
+
+        std::cout << "---------------------------------END---------------------------------" << std::endl;
     }
 
     bool doorsWindowManager::moveWindow(HWND hwnd, int x, int y, int width, int height)
