@@ -211,6 +211,7 @@ namespace lib {
             int totalMinWidth = 0;
             int totalExtraWidth = 0;
             int numberOfSmallerRegions = 0;
+            bool allSmallerThanBaseline = true;  // Flag to check if all regions are smaller than the baseline
 
             for (Region* region : regions) {
                 if (region->DWI->minSizes.ptMinTrackSize.x < sizePerRegionBaseline) {
@@ -219,34 +220,73 @@ namespace lib {
                 }
                 else {
                     totalExtraWidth += region->DWI->minSizes.ptMinTrackSize.x;  // Track regions larger than baseline
+                    allSmallerThanBaseline = false;  // At least one region is larger than the baseline
                 }
                 std::cout << "REGION min size for " << region->DWI->title << " | Min Width = " << region->DWI->minSizes.ptMinTrackSize.x << std::endl;
             }
 
-            // Handle the case where there are smaller regions to evenly distribute the remaining space
-            std::cout << "------------case 2--------------" << std::endl;
-            int remainingSpace = workAreaWidth - totalMinWidth - totalExtraWidth;
-            std::cout << "Remaining space: " << remainingSpace << std::endl;
+            // If all regions are smaller than the baseline, simply give them equal space
+            if (allSmallerThanBaseline) {
+                std::cout << "------------Case: All regions smaller than baseline--------------" << std::endl;
+                std::cout << "Equal space per region: " << sizePerRegionBaseline << std::endl;
 
-            if (remainingSpace > 0 && numberOfSmallerRegions > 0) {
-                // Calculate how much additional space each smaller region will get
-                int spacePerSmallerRegion = remainingSpace / numberOfSmallerRegions;
-
-                // Assign widths to regions that are smaller than their minimum size
-                for (Region* currRegion : regions) {
-                    if (currRegion->DWI->minSizes.ptMinTrackSize.x < sizePerRegionBaseline) {
-                        currRegion->mWidth = currRegion->DWI->minSizes.ptMinTrackSize.x + spacePerSmallerRegion;
-                        std::cout << "Adjusted width for smaller region: " << currRegion->DWI->title << " | Width = " << currRegion->mWidth << std::endl;
-                    }
-                    else {
-                        currRegion->mWidth = currRegion->DWI->minSizes.ptMinTrackSize.x;  // Regions already at their min size
-                    }
+                for (Region* region : regions) {
+                    region->mWidth = sizePerRegionBaseline;
+                    std::cout << "Adjusted width for region: " << region->DWI->title << " | Width = " << region->mWidth << std::endl;
                 }
             }
             else {
-                // If no remaining space, assign the baseline width to all regions
-                for (Region* region : regions) {
-                    region->mWidth = sizePerRegionBaseline;
+                // Handle the case where there are smaller regions to evenly distribute the remaining space
+                std::cout << "------------case 2--------------" << std::endl;
+                int remainingSpace = workAreaWidth - totalMinWidth - totalExtraWidth;
+                std::cout << "Remaining space: " << remainingSpace << std::endl;
+
+                if (remainingSpace > 0 && numberOfSmallerRegions > 0) {
+                    // Calculate how much additional space each smaller region will get
+                    int spacePerSmallerRegion = remainingSpace / numberOfSmallerRegions;
+
+                    // Assign widths to regions that are smaller than their minimum size
+                    for (Region* currRegion : regions) {
+                        if (currRegion->DWI->minSizes.ptMinTrackSize.x < sizePerRegionBaseline) {
+                            currRegion->mWidth = currRegion->DWI->minSizes.ptMinTrackSize.x + spacePerSmallerRegion;
+                            std::cout << "Adjusted width for smaller region: " << currRegion->DWI->title << " | Width = " << currRegion->mWidth << std::endl;
+                        }
+                        else {
+                            currRegion->mWidth = currRegion->DWI->minSizes.ptMinTrackSize.x;  // Regions already at their min size
+                        }
+                    }
+                }
+                else {
+                    // If no remaining space, we will start placing regions until we run out of space.
+                    int usedSpace = 0;
+                    std::vector<Region*> fitRegions;
+
+                    // First pass: Place as many regions as possible
+                    for (Region* region : regions) {
+                        // Check if the region can fit in the available space (based on its minimum width)
+                        if (usedSpace + max(region->DWI->minSizes.ptMinTrackSize.x, sizePerRegionBaseline) <= workAreaWidth) {
+                            // Place the region within the available space
+                            region->mWidth = max(region->DWI->minSizes.ptMinTrackSize.x, sizePerRegionBaseline);
+                            usedSpace += region->mWidth;
+                            fitRegions.push_back(region);
+                            std::cout << "Placed region: " << region->DWI->title << " | Width = " << region->mWidth << std::endl;
+                        }
+                        else {
+                            // Add regions that couldn't fit to the removed list
+                            removedRegions.push_back(region);
+                        }
+                    }
+
+                    // If there are any regions that still fit, distribute the remaining space
+                    if (usedSpace < workAreaWidth) {
+                        int remainingForFitting = workAreaWidth - usedSpace;
+                        int spacePerRegion = remainingForFitting / fitRegions.size();
+
+                        for (Region* region : fitRegions) {
+                            region->mWidth += spacePerRegion;
+                            std::cout << "Adjusted width for region: " << region->DWI->title << " | Width = " << region->mWidth << std::endl;
+                        }
+                    }
                 }
             }
         }
