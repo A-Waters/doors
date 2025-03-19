@@ -40,8 +40,9 @@ namespace lib {
         std::string title;
         DWORD lpdwProcessId; // will be 0 if not running as admin or sudo
         MINMAXINFO minSizes;
+        HMONITOR monitor;
 
-        DoorWindowInfo() : hwnd(0), title(""), lpdwProcessId(DWORD()), minSizes() {};
+        DoorWindowInfo() : hwnd(0), title(""), lpdwProcessId(DWORD()), minSizes(), monitor() {};
     };
 
     struct Region {
@@ -90,8 +91,8 @@ namespace lib {
         bool loadWindowInfo();
         bool isRunningAsAdmin();
         bool buildRegions();
-        DoorMonitorInfo* getMonitorInfoFromHandle(HMONITOR monitorHandle);
-        std::vector<Region*> calulateRegionForMonitor(DoorMonitorInfo* monitor);
+        DoorMonitorInfo* getMonitorInfoFromMonitorHandle(HMONITOR monitorHandle);
+        std::vector<Region*> doorsWindowManager::calculateRegionsForMonitor(DoorMonitorInfo* monitor);
         bool matchWindowsToRegions();
         Region* getRegionsByID(int regionAid);
         bool focusRegion(Region* regionToFocus);

@@ -84,14 +84,21 @@ namespace lib {
 
     bool doorsWindowManager::buildRegions()
     {
-        // Get which windows are on what monitors and create regions for each one
+        // not gonna work when deleting regions and then adding one back as we base the id on the size of the arr meaning there can be multiple regions with the same ID;
+        int regionsPlaced = 0;
+        // Get which windows are on what monitors and create regions for each one and set IDs
         for (DoorWindowInfo* DWIptr : mActiveWindows)
         {
             HMONITOR monitorHandle = MonitorFromWindow(DWIptr->hwnd, MONITOR_DEFAULTTONEAREST);
+
+            DWIptr->monitor = monitorHandle;
+
+
             if (this->mRegions.count(monitorHandle) == 0) {
                 // If no entry for this monitor, create a new entry
                 std::vector<Region*> newMonitors;
                 Region* newRegion = new Region(0, 0, 0, 0);
+                newRegion->id = regionsPlaced;
                 newRegion->DWI = DWIptr;
                 newRegion->DWI->minSizes = getMinSize(DWIptr->hwnd);
                 newMonitors.push_back(newRegion);
@@ -100,97 +107,22 @@ namespace lib {
             else {
                 // If monitor already has a vector, add the new window
                 Region* newRegion = new Region(0, 0, 0, 0);
+                newRegion->id = regionsPlaced;
                 newRegion->DWI = DWIptr;
                 newRegion->DWI->minSizes = getMinSize(DWIptr->hwnd);
                 this->mRegions[monitorHandle].push_back(newRegion);
             }
+            regionsPlaced += 1;
         }
-        int setId = 0;
-        // set the region locations and ids
-        for (const auto& pair : this->mRegions) {
-
-            std::vector<Region*> regionsForMonitor = pair.second; // Get windows on this monitor
-            HMONITOR monitorHandle = pair.first;
-            DoorMonitorInfo* monitor = getMonitorInfoFromHandle(monitorHandle);
-
-            // Work area (excluding taskbar)
-            int workAreaWidth = monitor->mMonitorInfo.rcWork.right - monitor->mMonitorInfo.rcWork.left;
-            int workAreaHeight = monitor->mMonitorInfo.rcWork.bottom - monitor->mMonitorInfo.rcWork.top;
-            int workAreaX = monitor->mMonitorInfo.rcWork.left;
-            int workAreaY = monitor->mMonitorInfo.rcWork.top;
-
-            size_t numberOfWindows = regionsForMonitor.size();
-            int totalMinWidth = 0;
-
-            // Calculate the total minimum width required for all windows
-            for (Region* region : regionsForMonitor) {
-                totalMinWidth += region->DWI->minSizes.ptMinTrackSize.x;
-                std::cout << region->DWI->title << " | Minimum Track Size: "
-                    << region->DWI->minSizes.ptMinTrackSize.x << "x"
-                    << region->DWI->minSizes.ptMinTrackSize.y << std::endl;
-            }
-
-            // Calculate the total gaps between the regions
-            int totalGaps = (this->gaps * numberOfWindows) + this->gaps;
-
-            // Check if the total minimum width exceeds the available width after considering gaps
-            int availableWidth = workAreaWidth - totalMinWidth - totalGaps;
-
-            if (availableWidth < 0) {
-                std::cout << "Total minimum width exceeds available space. Need to handle this!" << std::endl;
-                // Handle scaling or stacking if the total minimum width exceeds available space
-                // For now, you could potentially handle this by stacking the windows vertically
-                // or scaling them down to fit
-                availableWidth = 0;  // No extra space, all windows will take their minimum width
-            }
-
-            // Now we calculate the width per region, ensuring it doesn't exceed the available space
-            int widthPerRegion = (availableWidth / numberOfWindows);
-
-            std::cout << "Available width for regions: " << availableWidth
-                << " | Width per region: " << widthPerRegion << std::endl;
-
-            // Now we need to place each region
-            int regionsPlaced = 0;
-            int setId = 0; // Initialize setId if not set elsewhere
-
-            // Track the position of the last placed region
-            int lastPlacedX = workAreaX + this->gaps;  // Start at the work area X with initial gap
-            int lastPlacedY = workAreaY + this->gaps;  // Start at the work area Y with initial gap
-
-            for (Region* region : regionsForMonitor) {
-                // Ensure the region’s width respects its minimum size
-                region->id = setId;
-                region->mWidth = max(widthPerRegion, region->DWI->minSizes.ptMinTrackSize.x);
-                region->mHeight = workAreaHeight - this->gaps;
-
-                // Position the region based on the last placed region
-                region->mX = lastPlacedX;
-                region->mY = lastPlacedY;
-
-                // Update lastPlacedX for the next region
-                lastPlacedX = region->mX + region->mWidth + this->gaps;  // Move to the next position after the current region
-
-                regionsPlaced += 1;
-                setId += 1;
-
-                // Output for debugging
-                std::cout << "BUILDING - " << region->DWI->title << " : "
-                    << " [" << regionsPlaced << "] "
-                    << region->mX << "x" << region->mY << " "
-                    << region->mWidth << "x" << region->mHeight << std::endl;
-
-                // Move the window to its new position
-                // MoveWindow(region->DWI->hwnd, region->mX, region->mY, region->mWidth, region->mHeight, TRUE);
-            }
+        // set the region locations
+        for (DoorMonitorInfo* monitor : this->mActiveMonitors) {
+            calculateRegionsForMonitor(monitor);
         }
-
-        // Ensure that all windows are matched to their new region
 
         return true;
     }
 
-    DoorMonitorInfo* doorsWindowManager::getMonitorInfoFromHandle(HMONITOR monitorHandle) {
+    DoorMonitorInfo* doorsWindowManager::getMonitorInfoFromMonitorHandle(HMONITOR monitorHandle) {
         auto monitorIt = std::find_if(this->mActiveMonitors.begin(), this->mActiveMonitors.end(), [monitorHandle](const DoorMonitorInfo* curr) {
             return monitorHandle == curr->mMonitorHandle;
             });
@@ -201,15 +133,19 @@ namespace lib {
         return nullptr; // or handle the case when the monitor isn't found
     }
 
+
+
     // returns regions which can not fit on screen
-    std::vector<Region*> doorsWindowManager::calulateRegionForMonitor(DoorMonitorInfo* monitor) {
+    std::vector<Region*> doorsWindowManager::calculateRegionsForMonitor(DoorMonitorInfo* monitor) {
 
         std::vector<Region*> removedRegions;
-
         std::vector<Region*> regions = this->mRegions[monitor->mMonitorHandle];
 
-        if (regions.size() <= 0) {
-            return removedRegions;
+        std::cout << " =================================== " << monitor->mMonitorHandle << " =================================== " << std::endl;
+
+        if (regions.empty()) {
+            std::cerr << "No regions to process!" << std::endl;
+            return removedRegions;  // No regions to process
         }
 
         // Work area (excluding taskbar)
@@ -218,33 +154,122 @@ namespace lib {
         int workAreaX = monitor->mMonitorInfo.rcWork.left;
         int workAreaY = monitor->mMonitorInfo.rcWork.top;
 
+        std::cout << "Work Area Dimensions: Width = " << workAreaWidth << ", Height = " << workAreaHeight << std::endl;
+
+        // Edge Case: Handle negative or zero work area
+        if (workAreaHeight <= 0 || workAreaWidth <= 0) {
+            std::cerr << "Error: Invalid work area dimensions!" << std::endl;
+            return removedRegions;
+        }
+
+        // Calculate the total min width of all regions
         int totalMinWidth = 0;
+        Region* smallestRegion = nullptr;
+
         for (Region* region : regions) {
             totalMinWidth += region->DWI->minSizes.ptMinTrackSize.x;
+
+            // Track the smallest region (in terms of min width)
+            if (!smallestRegion || region->DWI->minSizes.ptMinTrackSize.x < smallestRegion->DWI->minSizes.ptMinTrackSize.x) {
+                smallestRegion = region;
+            }
         }
 
+        // Edge case: If the total min width exceeds the available work area width, remove the smallest region
         if (totalMinWidth > workAreaWidth) {
-            printf("too big");
-            // TODO
-            // future alex issue
+            std::cerr << "Error: Total minimum width exceeds the available space! Removing the smallest region." << std::endl;
+
+            // Add the smallest region to the removedRegions list
+            removedRegions.push_back(smallestRegion);
+
+            // Remove the smallest region from the regions list
+            regions.erase(std::remove(regions.begin(), regions.end(), smallestRegion), regions.end());
+
+            // Optionally, remove the monitor handle from the regions map
+            this->mRegions.erase(monitor->mMonitorHandle);
+            
+            // recaulate with new regions
+            for (Region* region : regions) {
+                totalMinWidth += region->DWI->minSizes.ptMinTrackSize.x;
+            }
         }
-        
-        int widthPerRegion = (workAreaWidth - totalMinWidth) / regions.size();
 
-        int lastPlacedRegionWidth = 0;
-        int lastPlacedRegionX = 0;
+        // Now proceed with the original layout calculation logic, as space is sufficient for all regions
+        // Case 1: Only one region
+        if (regions.size() == 1) {
+            std::cout << "------------case 1--------------" << std::endl;
+            regions.at(0)->mWidth = workAreaWidth;  // Assign the full width to the single region
+        }
+        else {
+            std::cout << "multiple windows found: " << regions.size() << std::endl;
 
-        for (Region * region : regions) {
-            region->mX = lastPlacedRegionX + lastPlacedRegionWidth + this->gaps;
+            // Calculate the "normal sizes" for all equally split regions
+            int sizePerRegionBaseline = workAreaWidth / regions.size();
+            std::cout << "sizePerRegionBaseline: " << sizePerRegionBaseline << std::endl;
+
+            // Calculate total min width of all regions
+            int totalMinWidth = 0;
+            int totalExtraWidth = 0;
+            int numberOfSmallerRegions = 0;
+
+            for (Region* region : regions) {
+                if (region->DWI->minSizes.ptMinTrackSize.x < sizePerRegionBaseline) {
+                    totalMinWidth += region->DWI->minSizes.ptMinTrackSize.x;  // Track regions smaller than baseline
+                    numberOfSmallerRegions++;
+                }
+                else {
+                    totalExtraWidth += region->DWI->minSizes.ptMinTrackSize.x;  // Track regions larger than baseline
+                }
+                std::cout << "REGION min size for " << region->DWI->title << " | Min Width = " << region->DWI->minSizes.ptMinTrackSize.x << std::endl;
+            }
+
+            // Handle the case where there are smaller regions to evenly distribute the remaining space
+            std::cout << "------------case 2--------------" << std::endl;
+            int remainingSpace = workAreaWidth - totalMinWidth - totalExtraWidth;
+            std::cout << "Remaining space: " << remainingSpace << std::endl;
+
+            if (remainingSpace > 0 && numberOfSmallerRegions > 0) {
+                // Calculate how much additional space each smaller region will get
+                int spacePerSmallerRegion = remainingSpace / numberOfSmallerRegions;
+
+                // Assign widths to regions that are smaller than their minimum size
+                for (Region* currRegion : regions) {
+                    if (currRegion->DWI->minSizes.ptMinTrackSize.x < sizePerRegionBaseline) {
+                        currRegion->mWidth = currRegion->DWI->minSizes.ptMinTrackSize.x + spacePerSmallerRegion;
+                        std::cout << "Adjusted width for smaller region: " << currRegion->DWI->title << " | Width = " << currRegion->mWidth << std::endl;
+                    }
+                    else {
+                        currRegion->mWidth = currRegion->DWI->minSizes.ptMinTrackSize.x;  // Regions already at their min size
+                    }
+                }
+            }
+            else {
+                // If no remaining space, assign the baseline width to all regions
+                for (Region* region : regions) {
+                    region->mWidth = sizePerRegionBaseline;
+                }
+            }
+        }
+
+        // Assign positions and sizes for each region
+        int nextXStart = workAreaX + this->gaps;  // Start with the left gap
+
+        for (Region* region : regions) {
+            region->mX = nextXStart + this->gaps;
             region->mY = workAreaY;
-
-            region->mWidth = max(region->DWI->minSizes.ptMinTrackSize.x, totalMinWidth);
             region->mHeight = workAreaHeight;
+
+            std::cout << "Assigned position to " << region->DWI->title << " | X = " << region->mX << ", Y = " << region->mY << ", Width = " << region->mWidth << ", Height = " << region->mHeight << std::endl;
+
+            nextXStart = region->mX + region->mWidth;
         }
 
         return removedRegions;
     }
 
+    
+
+    
 
     bool doorsWindowManager::matchWindowsToRegions()
     {
@@ -252,49 +277,7 @@ namespace lib {
         int monitorsSize = this->mActiveMonitors.size();
 
         for (DoorMonitorInfo* monitor : this->mActiveMonitors) {
-           
-            std::vector<Region*> onMonitorRegions = this->mRegions[monitor->mMonitorHandle];
-
-
-
-            if (onMonitorRegions.size() != 0) {
-                
-
-
-
-                int workAreaWidth = monitor->mMonitorInfo.rcWork.right - monitor->mMonitorInfo.rcWork.left;
-                int workAreaHeight = monitor->mMonitorInfo.rcWork.bottom - monitor->mMonitorInfo.rcWork.top;
-
-                int workAreaX = monitor->mMonitorInfo.rcWork.left;
-                int workAreaY = monitor->mMonitorInfo.rcWork.top;
-                
-                
-                int widthPerRegion = workAreaWidth / onMonitorRegions.size();
-                int regionsPlaced = 0;
-                
-                // Track the position of the last placed region
-                int lastPlacedX = workAreaX + this->gaps;  // Start at the work area X with initial gap
-                int lastPlacedY = workAreaY + this->gaps;  // Start at the work area Y with initial gap
-    
-                for (Region* region : onMonitorRegions) {
-                    region->mWidth = max(widthPerRegion, region->DWI->minSizes.ptMinTrackSize.x);
-                    region->mHeight = workAreaHeight - this->gaps;
-
-                    // Position the region based on the last placed region
-                    region->mX = lastPlacedX;
-                    region->mY = lastPlacedY;
-
-                    // Update lastPlacedX for the next region
-                    lastPlacedX = region->mX + region->mWidth + this->gaps;  // Move to the next position after the current region
-
-                    regionsPlaced += 1;
-                    regionsPlaced += 1;
-                }
-            }
-            else {
-                std::cout << "no regions on montitor" << monitor->mMonitorHandle << std::endl;
-            }
-            
+            calculateRegionsForMonitor(monitor);
         }
         // move items 
         for (const auto& pair : this->mRegions) {
@@ -339,9 +322,9 @@ namespace lib {
         this->moveMouse(100, 100);
         this->buildRegions();
         matchWindowsToRegions();
-        printf("====================== waiting ===================== \n");
-        Sleep(3000);
-        matchWindowsToRegions();
+        // printf("====================== waiting ===================== \n");
+        //Sleep(3000);
+        // matchWindowsToRegions();
         this->printInfo();
         // Remove the keyboard hook
 
