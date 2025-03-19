@@ -81,7 +81,10 @@ namespace lib {
 
     private:
         Region* mFocused;
-        int gaps = 0;
+        int sideGaps = 10;
+        int topGap = 10;
+        int botGap = 10;
+        int innerGap = 10;
         std::vector <DoorWindowInfo*> mActiveWindows;
         std::vector <DoorMonitorInfo*> mActiveMonitors;
         std::map<HMONITOR, std::vector<Region*>> mRegions;
