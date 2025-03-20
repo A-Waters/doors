@@ -341,7 +341,7 @@ namespace lib {
         this->buildRegions();
         matchWindowsToRegions();
         // printf("====================== waiting ===================== \n");
-        // Sleep(3000);
+        Sleep(2000);
         // matchWindowsToRegions();
         this->printInfo();
         // Remove the keyboard hook
@@ -659,8 +659,8 @@ namespace lib {
             // Remove the region from the 'fromMonitor' vector
             fromMonitor.erase(foundRegion);
 
-            // Add the region to the 'toMonitor' vector
-            toMonitor.push_back(regionToMove);
+            // bad preformance but its C so
+            toMonitor.insert(toMonitor.begin(), regionToMove);
 
             std::cout << "Successfully moved region " << regionToMove->id << " to monitor " << to << std::endl;
             return true; // Return true to indicate success
