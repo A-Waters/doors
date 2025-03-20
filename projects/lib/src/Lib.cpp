@@ -139,7 +139,7 @@ namespace lib {
     std::vector<Region*> doorsWindowManager::calculateRegionsForMonitor(DoorMonitorInfo* monitor) {
 
         std::vector<Region*> removedRegions;
-        std::vector<Region*> regions = this->mRegions[monitor->mMonitorHandle];
+        std::vector<Region*>& regions = mRegions[monitor->mMonitorHandle];
 
         std::cout << " =================================== " << monitor->mMonitorHandle << " =================================== " << std::endl;
 
@@ -155,8 +155,8 @@ namespace lib {
         int workAreaY = monitor->mMonitorInfo.rcWork.top;
 
         // Subtract the gaps from the work area to get the usable area
-        int usableWidth = workAreaWidth - 2 * this->sideGaps; // minus left and right side gaps
-        int usableHeight = workAreaHeight - this->topGap - this->botGap; // minus top and bottom gaps
+        int usableWidth = workAreaWidth - 2 * sideGaps;  // minus left and right side gaps
+        int usableHeight = workAreaHeight - topGap - botGap;  // minus top and bottom gaps
 
         std::cout << "Usable Area Dimensions: Width = " << usableWidth << ", Height = " << usableHeight << std::endl;
 
@@ -166,96 +166,79 @@ namespace lib {
             return removedRegions;
         }
 
-        // Now we need to calculate the total width of all windows, accounting for the gaps
+        // Calculate total minimum width and find the smallest region
         int totalMinWidth = 0;
         Region* smallestRegion = nullptr;
-
         for (Region* region : regions) {
             totalMinWidth += region->DWI->minSizes.ptMinTrackSize.x;
-
-            // Track the smallest region (in terms of min width)
             if (!smallestRegion || region->DWI->minSizes.ptMinTrackSize.x < smallestRegion->DWI->minSizes.ptMinTrackSize.x) {
                 smallestRegion = region;
             }
         }
 
-        // Edge case: If the total min width exceeds the available usable width, remove the smallest region
+        // If the total min width exceeds the usable width, remove the smallest region
         if (totalMinWidth > usableWidth) {
             std::cerr << "Error: Total minimum width exceeds the available usable space! Removing the smallest region." << std::endl;
 
-            // Add the smallest region to the removedRegions list
+            // Add smallest region to removed list and remove it from regions
             removedRegions.push_back(smallestRegion);
-
-            // Remove the smallest region from the regions list
             regions.erase(std::remove(regions.begin(), regions.end(), smallestRegion), regions.end());
+            mRegions.erase(monitor->mMonitorHandle);  // Remove the monitor handle from regions map
 
-            // Optionally, remove the monitor handle from the regions map
-            this->mRegions.erase(monitor->mMonitorHandle);
-
-            // Recalculate with new regions
+            // Recalculate the total min width after removing the smallest region
+            totalMinWidth = 0;
             for (Region* region : regions) {
                 totalMinWidth += region->DWI->minSizes.ptMinTrackSize.x;
             }
         }
 
-        // Now proceed with the layout calculation logic, making sure to fit the windows on the screen
+        // Handle layout calculation depending on the number of regions
         if (regions.size() == 1) {
-            std::cout << "------------case 1--------------" << std::endl;
-            regions.at(0)->mWidth = usableWidth;  // Assign the full usable width to the single region
+            regions[0]->mWidth = usableWidth;  // Assign the full usable width to the single region
         }
         else {
-            std::cout << "multiple windows found: " << regions.size() << std::endl;
-
-            // Calculate the "normal sizes" for all equally split regions
             int sizePerRegionBaseline = usableWidth / regions.size();
-            std::cout << "sizePerRegionBaseline: " << sizePerRegionBaseline << std::endl;
-
-            // Calculate total min width of all regions
-            int totalMinWidth = 0;
             int totalExtraWidth = 0;
+            int totalMinWidth = 0;
             int numberOfSmallerRegions = 0;
             bool allSmallerThanBaseline = true;
 
+            // Calculate the total minimum width and track larger regions
             for (Region* region : regions) {
-                if (region->DWI->minSizes.ptMinTrackSize.x < sizePerRegionBaseline) {
-                    totalMinWidth += region->DWI->minSizes.ptMinTrackSize.x;  // Track regions smaller than baseline
+                int regionMinWidth = region->DWI->minSizes.ptMinTrackSize.x;
+                if (regionMinWidth < sizePerRegionBaseline) {
+                    totalMinWidth += regionMinWidth;
                     numberOfSmallerRegions++;
                 }
                 else {
-                    totalExtraWidth += region->DWI->minSizes.ptMinTrackSize.x;  // Track regions larger than baseline
-                    allSmallerThanBaseline = false;  // At least one region is larger than the baseline
+                    totalExtraWidth += regionMinWidth;
+                    allSmallerThanBaseline = false;
                 }
-                std::cout << "REGION min size for " << region->DWI->title << " | Min Width = " << region->DWI->minSizes.ptMinTrackSize.x << std::endl;
+                std::cout << "REGION min size for " << region->DWI->title << " | Min Width = " << regionMinWidth << std::endl;
             }
 
-            // If all regions are smaller than the baseline, simply give them equal space
             if (allSmallerThanBaseline) {
                 std::cout << "------------Case: All regions smaller than baseline--------------" << std::endl;
-                std::cout << "Equal space per region: " << sizePerRegionBaseline << std::endl;
-
                 for (Region* region : regions) {
                     region->mWidth = sizePerRegionBaseline;
                     std::cout << "Adjusted width for region: " << region->DWI->title << " | Width = " << region->mWidth << std::endl;
                 }
             }
             else {
-                // If there are smaller regions to evenly distribute the remaining space
-                std::cout << "------------case 2--------------" << std::endl;
                 int remainingSpace = usableWidth - totalMinWidth - totalExtraWidth;
                 std::cout << "Remaining space: " << remainingSpace << std::endl;
 
                 if (remainingSpace > 0 && numberOfSmallerRegions > 0) {
-                    // Calculate how much additional space each smaller region will get
                     int spacePerSmallerRegion = remainingSpace / numberOfSmallerRegions;
 
-                    // Assign widths to regions that are smaller than their minimum size
-                    for (Region* currRegion : regions) {
-                        if (currRegion->DWI->minSizes.ptMinTrackSize.x < sizePerRegionBaseline) {
-                            currRegion->mWidth = currRegion->DWI->minSizes.ptMinTrackSize.x + spacePerSmallerRegion;
-                            std::cout << "Adjusted width for smaller region: " << currRegion->DWI->title << " | Width = " << currRegion->mWidth << std::endl;
+                    for (Region* region : regions) {
+                        int regionMinWidth = region->DWI->minSizes.ptMinTrackSize.x;
+                        if (regionMinWidth < sizePerRegionBaseline) {
+                            region->mWidth = regionMinWidth + spacePerSmallerRegion;
+                            std::cout << "Adjusted width for smaller region: " << region->DWI->title << " | Width = " << region->mWidth << std::endl;
                         }
                         else {
-                            currRegion->mWidth = currRegion->DWI->minSizes.ptMinTrackSize.x;  // Regions already at their min size
+                            region->mWidth = regionMinWidth;  // Keep regions larger than baseline at their min size
                         }
                     }
                 }
@@ -263,28 +246,23 @@ namespace lib {
         }
 
         // Adjust positions and sizes for each region
-        int nextXStart = workAreaX + this->sideGaps;  // Start with the left side gap
-        int nextYStart = workAreaY + this->topGap;  // Start with the top gap
+        int nextXStart = workAreaX + sideGaps;
+        int nextYStart = workAreaY + topGap;
 
         for (size_t i = 0; i < regions.size(); ++i) {
             Region* region = regions[i];
 
-            // Ensure the window doesn't exceed the monitor boundaries
-            if (nextXStart + region->mWidth + this->sideGaps > workAreaX + usableWidth) {
-                region->mWidth = workAreaX + usableWidth - nextXStart - this->sideGaps;  // Adjust width to fit within the available space
+            if (nextXStart + region->mWidth + sideGaps > workAreaX + usableWidth) {
+                region->mWidth = workAreaX + usableWidth - nextXStart - sideGaps;  // Adjust width to fit within available space
             }
 
-            // Adjust the width for balancing the space reduction evenly from both sides
             if (i < regions.size() - 1) {
                 Region* nextRegion = regions[i + 1];
-                int spaceToReduce = (nextRegion->mWidth + region->mWidth + this->innerGap) - usableWidth;
-
+                int spaceToReduce = (nextRegion->mWidth + region->mWidth + innerGap) - usableWidth;
                 if (spaceToReduce > 0) {
-                    // Try to evenly distribute space reduction
                     int reduceFromCurrent = min(spaceToReduce / 2, region->mWidth - region->DWI->minSizes.ptMinTrackSize.x);
                     int reduceFromNext = spaceToReduce - reduceFromCurrent;
 
-                    // Ensure we don't reduce below the minimum size
                     region->mWidth -= reduceFromCurrent;
                     nextRegion->mWidth -= reduceFromNext;
                 }
@@ -296,13 +274,11 @@ namespace lib {
 
             std::cout << "Assigned position to " << region->DWI->title << " | X = " << region->mX << ", Y = " << region->mY << ", Width = " << region->mWidth << ", Height = " << region->mHeight << std::endl;
 
-            // Update nextXStart to include the width of the current region and the inner gap before the next one
-            nextXStart = region->mX + region->mWidth + this->innerGap;
+            nextXStart = region->mX + region->mWidth + innerGap;
 
-            // Ensure we don’t overflow vertically
-            if (nextYStart + region->mHeight + this->botGap > workAreaY + usableHeight) {
+            if (nextYStart + region->mHeight + botGap > workAreaY + usableHeight) {
                 std::cerr << "Error: Window " << region->DWI->title << " overflows vertically. Adjusting height." << std::endl;
-                region->mHeight = workAreaY + usableHeight - nextYStart - this->botGap;  // Adjust height to fit
+                region->mHeight = workAreaY + usableHeight - nextYStart - botGap;
             }
         }
 
