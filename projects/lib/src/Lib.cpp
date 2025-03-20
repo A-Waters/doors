@@ -365,11 +365,30 @@ namespace lib {
         this->buildRegions();
         matchWindowsToRegions();
         // printf("====================== waiting ===================== \n");
-        //Sleep(3000);
+        // Sleep(3000);
         // matchWindowsToRegions();
         this->printInfo();
         // Remove the keyboard hook
+        if (mActiveMonitors.size() >= 2) {
+            HMONITOR fromMonitor = mActiveMonitors[0]->mMonitorHandle;  // First monitor
+            HMONITOR toMonitor = mActiveMonitors[1]->mMonitorHandle;    // Second monitor
 
+            // Find a region associated with the first monitor (just an example)
+            if (!mRegions[fromMonitor].empty()) {
+                Region* regionToMove = mRegions[fromMonitor][0];  // Assume first region on the first monitor
+
+                // Move this region to the second monitor
+                bool result = moveRegionToMonitor(fromMonitor, toMonitor, regionToMove);
+
+                if (result) {
+                    std::cout << "Region moved successfully!" << std::endl;
+                }
+                else {
+                    std::cout << "Failed to move region!" << std::endl;
+                }
+            }
+        }
+        matchWindowsToRegions();
 
         // this->swapRegionsByID(3, 4);
     }
@@ -613,7 +632,14 @@ namespace lib {
         return false;
     }
 
-    bool doorsWindowManager::moveRegion(HMONITOR from, HMONITOR to, Region* regionToMove) {
+    bool doorsWindowManager::moveRegionToMonitor(HMONITOR from, HMONITOR to, Region* regionToMove) {
+        
+        // if you have gone clinicically insane 
+        if (mActiveMonitors.size() < 2) {
+            std::cout << "Error: less than two monitors!" << mActiveMonitors.size() << std::endl;
+            return false;
+        }
+        
         // Check if the region is valid
         if (regionToMove == nullptr) {
             std::cout << "Error: regionToMove is null!" << std::endl;

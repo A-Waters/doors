@@ -77,7 +77,8 @@ namespace lib {
         bool swapRegions(Region* regionA, Region* regionB);
         bool createRegion(HMONITOR monitor, int x, int y, int length, int height, DoorWindowInfo* dwi);
         bool deleteRegion(HMONITOR monitor, Region* regionToRemove);
-        bool moveRegion(HMONITOR from, HMONITOR to, Region* regionToMove);
+        // bool moveRegion(HMONITOR from, HMONITOR to, Region* regionToMove);
+        bool moveRegionToMonitor(HMONITOR from, HMONITOR to, Region* regionToMove);
 
     private:
         Region* mFocused;
@@ -95,7 +96,8 @@ namespace lib {
         bool isRunningAsAdmin();
         bool buildRegions();
         DoorMonitorInfo* getMonitorInfoFromMonitorHandle(HMONITOR monitorHandle);
-        std::vector<Region*> doorsWindowManager::calculateRegionsForMonitor(DoorMonitorInfo* monitor);
+        std::vector<Region*> calculateRegionsForMonitor(DoorMonitorInfo* monitor);
+
         bool matchWindowsToRegions();
         Region* getRegionsByID(int regionAid);
         bool focusRegion(Region* regionToFocus);
