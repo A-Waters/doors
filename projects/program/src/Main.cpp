@@ -3,12 +3,10 @@
 #include <string>
 
 int main(int, char**) {
-    lib::doorsWindowManager DOORS;
+    lib::DoorsWindowManager DOORS;
     std::cout << "all done";
     std::flush(std::cout);
-    std::string userInput;
-
-
+    system("pause");
 
     return 0;
 }
