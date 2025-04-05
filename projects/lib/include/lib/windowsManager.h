@@ -1,4 +1,6 @@
-#pragma once
+#ifndef WINDOWS_MANAGER_H
+#define WINDOWS_MANAGER_H
+
 #include <windows.h>
 #include <winuser.h>
 #include <winnt.h>
@@ -117,7 +119,7 @@ namespace lib {
         void printInfo() const;
         bool moveWindow(DoorWindowInfo* dwi, int x, int y, int width, int height);
         bool moveMouse(int x, int y);
-        DoorsWindowManager::Region* getRegionByWindowHandle(HWND hwnd);
+        // DoorsWindowManager::Region* getRegionByWindowHandle(HWND hwnd);
         bool shiftRegionToDirection(Region* region, Direction dir);
         bool swapRegionsByID(int regionAid, int regionBid);
         bool swapRegions(Region* regionA, Region* regionB);
@@ -154,3 +156,5 @@ namespace lib {
     };
     
 }
+
+#endif

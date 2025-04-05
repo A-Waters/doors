@@ -1,5 +1,5 @@
-#include "Lib.h"
-using namespace std;
+#include "windowsManager.h"
+
 
 
 
@@ -856,9 +856,8 @@ namespace lib {
 
     bool DoorsWindowManager::moveWindow(DoorWindowInfo* dwi, int x, int y, int width, int height)
     {
-        getRegionByWindowHandle(dwi);
         // https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowpos
-        return SetWindowPos(hwnd, HWND_TOP,x, y, width, height, SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS);
+        return SetWindowPos(dwi->hwnd, HWND_TOP,x, y, width, height, SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS);
     }
 
     bool DoorsWindowManager::moveMouse(int x, int y) {
@@ -871,10 +870,6 @@ namespace lib {
         }
     }
 
-    DoorsWindowManager::Region* DoorsWindowManager::getRegionByWindowInfo(DoorWindowInfo* dwi) {
-        
 
-
-    }
 
 }

@@ -7,18 +7,10 @@ project "lib"
     warnings      "extra"
     targetdir     (BIN_DIR)
     objdir        (OBJ_DIR)
-    files {
-        "src/**.h",
-        "src/**.hpp",
+    files { 
         "src/**.cpp",
+        "./include/lib/**.h" 
     }
     includedirs {
-        "include/lib",
-        "src/"
-    }
-    links {
-        
-    }
-    defines {
-
+        "./include/**",
     }

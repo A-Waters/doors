@@ -1,4 +1,4 @@
-project "program"
+project "frontend"
     kind          "ConsoleApp"
     language      "C++"
     cppdialect    "C++17"
@@ -13,12 +13,8 @@ project "program"
         "src/**.cpp",
     }
     includedirs {
-        "src",
-        ROOT_PATH "projects/lib/include",
+      "../lib/include/**",
     }
     links {
         "lib"
-    }
-    defines {
-
     }

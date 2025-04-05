@@ -1,4 +1,4 @@
 PROJECTS = {
     "projects/lib",
-    "projects/program",
+    "projects/frontend",
 }
