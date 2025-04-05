@@ -9,7 +9,7 @@ BIN_DIR  = ROOT_PATH "_out/bin/%{cfg.buildcfg}-%{cfg.platform}/%{prj.name}"
 OBJ_DIR  = ROOT_PATH "_out/obj/%{cfg.buildcfg}-%{cfg.platform}/%{prj.name}"
 
 WORKSPACE_NAME = "doors"
-START_PROJECT  = "user"
+START_PROJECT  = "frontend"
 
 include "workspace.lua"
 include "projects.lua"
