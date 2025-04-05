@@ -17,3 +17,17 @@ include "projects.lua"
 for _, path in ipairs(PROJECTS) do
     include(path .. "/premake5.lua")
 end
+
+newaction {
+    trigger = "bb",  
+    description = "Build and run the project",
+    execute = function ()
+        -- Generate Visual Studio project files using Premake
+        -- os.execute("premake5 vs2022")
+        
+        -- build
+        os.execute("'C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\MSBuild\\Current\\Bin\\amd64\\MSBuild.exe' MyWorkspace.sln /p:Configuration=Debug /p:Platform=x64") 
+        -- Run the compiled executable (make sure to update the path if needed)
+        os.execute(ROOT_PATH("_out/bin/debug-x64/frontend/frontend.exe"))
+    end
+}
