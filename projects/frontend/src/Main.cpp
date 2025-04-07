@@ -1,12 +1,13 @@
-#include "windowsManager.h"
+#include "lib/keyboardListener.h"
 #include <iostream>
 #include <string>
 
 int main(int, char**) {
-    lib::DoorsWindowManager DOORS;
-    std::cout << "all done";
+    lib::DoorsWindowManager doors;
+    lib::KeyboardListener listener = lib::KeyboardListener(&doors);
+    listener.StartListening();
+    std::cout << "done" << std::endl;    
     std::flush(std::cout);
-    system("pause");
-
+    std::cout << "fluhed" << std::endl;    
     return 0;
 }

@@ -9,8 +9,9 @@ project "lib"
     objdir        (OBJ_DIR)
     files { 
         "src/**.cpp",
+        "src/**.h",
         "./include/lib/**.h" 
     }
     includedirs {
-        "./include/**",
+        "./include",
     }

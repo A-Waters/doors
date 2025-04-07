@@ -13,7 +13,7 @@ project "frontend"
         "src/**.cpp",
     }
     includedirs {
-      "../lib/include/**",
+      "../lib/include",
     }
     links {
         "lib"

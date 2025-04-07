@@ -1,9 +1,7 @@
 #ifndef WINDOWS_MANAGER_H
 #define WINDOWS_MANAGER_H
 
-#include <windows.h>
-#include <winuser.h>
-#include <winnt.h>
+#include "commonDoors.h"
 #include <iostream>
 #include <vector>
 #include <map>
@@ -54,8 +52,6 @@
 
 namespace lib {
    
-    static BOOL CALLBACK enumWindowCallback(HWND hWnd, LPARAM lparam);
-    static BOOL CALLBACK enumMonitorCallback(HMONITOR monitorHandle, HDC deviceContextHandle, LPRECT cords, LPARAM);
 
     class DoorsWindowManager {
 

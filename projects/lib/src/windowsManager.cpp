@@ -1,6 +1,5 @@
-#include "windowsManager.h"
-
-
+#include "../include/lib/windowsManager.h"
+#include "../include/lib/commonDoors.h"
 
 
 // Structure to hold window information
@@ -356,8 +355,10 @@ namespace lib {
         this->mIsAdmin = isRunningAsAdmin();
         this->loadWindowInfo();
         this->loadMonitorInfo();       
-        this->printInfo();   
-        this->moveMouse(100, 100);
+        this->buildRegions();
+        // matchWindowsToRegions();
+        
+        /*this->moveMouse(100, 100);
         this->buildRegions();
         matchWindowsToRegions();
         printf("====================== waiting ===================== \n");
@@ -398,10 +399,10 @@ namespace lib {
                 Sleep(3);
                 shiftRegionToDirection(regionToMove, DoorsWindowManager::up);
                 matchWindowsToRegions();
-                */
+                
             }
         }
-        matchWindowsToRegions();
+        matchWindowsToRegions();*/
         
 
         // this->swapRegionsByID(3, 4);
