@@ -468,21 +468,33 @@ namespace lib {
 
         if (regionToFocus != NULL) {
             std::cout << "now Focusing Region : " << regionToFocus->DWI->title << std::endl;
-            // SetForegroundWindow(regionToFocus->DWI->hwnd);
-            // SetFocus(regionToFocus->DWI->hwnd);
+            SetForegroundWindow(regionToFocus->DWI->hwnd);
+            
+            /*if (this->isRunningAsAdmin()) {
+                SetFocus(regionToFocus->DWI->hwnd);
+            }*/
+            
+
 
             DWORD error = GetLastError();
             if (error) {
+                std::cout << "Error with setting focus " << error << std::endl;
                 return false;
             }
             // highlightRegion(regionToFocus);
             this->mFocusedRegion = regionToFocus;
+            int vertCenter = (regionToFocus->mHeight / 2) + (regionToFocus->mY);
+            int horzCenter = (regionToFocus->mWidth / 2) + (regionToFocus->mX);
+            moveMouse(vertCenter, horzCenter);
             this->mFocusedMonitor = NULL;
             return true;
         }
         else if (monitorToFocus != NULL) {
             std::cout << "now Focusing Monitor !" << std::endl;
-            // SetFocus(NULL);
+            // SetForegroundWindow(NULL);
+            /*if (this->isRunningAsAdmin()) {
+                SetFocus(NULL);
+            }*/
 
             this->mFocusedMonitor = monitorToFocus;
             this->mFocusedRegion = NULL;
@@ -1013,7 +1025,7 @@ namespace lib {
                         }
                         else {
                             std::cout << "moving new monitors" << std::endl;
-                            this->focusLocation(NULL, foundMonitor);
+                            // this->focusLocation(NULL, foundMonitor);
                         }
                     }
                     else {
@@ -1034,33 +1046,51 @@ namespace lib {
                 case left:
                     // if there is a monitor on the left side
                     if (this->mFocusedMonitor->mMonitorInfo.rcMonitor.left > monitor->mMonitorInfo.rcMonitor.right) {
-                        this->focusLocation(NULL, monitor);
+                        if (this->getRegionsFromMonitorInfo(monitor).size() > 0) {
+                            this->focusLocation(this->getRegionsFromMonitorInfo(monitor).back(), NULL);
+                        }
+                        else {
+                            this->focusLocation(NULL, monitor);
+                        }
+                        
                     }
                     break;
 
                 case right:
                     // if there is a monitor on the right side
                     if (this->mFocusedMonitor->mMonitorInfo.rcMonitor.right < monitor->mMonitorInfo.rcMonitor.left) {
-                        this->focusLocation(NULL, monitor);
-                        break;
+                        if (this->getRegionsFromMonitorInfo(monitor).size() > 0) {
+                            this->focusLocation(this->getRegionsFromMonitorInfo(monitor).back(), NULL);
+                        }
+                        else {
+                            this->focusLocation(NULL, monitor);
+                        }
                     }
                     break;
 
-                case up:
+                /*case up:
                     // if there is a monitor above (compare y-coordinate)
                     if (this->mFocusedMonitor->mCords->top > monitor->mCords->bottom) {
-                        this->focusLocation(NULL, monitor);
-                        break;
+                        if (this->getRegionsFromMonitorInfo(monitor).size() > 0) {
+                            this->focusLocation(this->getRegionsFromMonitorInfo(monitor).back(), NULL);
+                        }
+                        else {
+                            this->focusLocation(NULL, monitor);
+                        }
                     }
                     break;
 
                 case down:
                     // if there is a monitor below (compare y-coordinate)
                     if (this->mFocusedMonitor->mCords->bottom < monitor->mCords->top) {
-                        this->focusLocation(NULL, monitor);
-                        break;
+                        if (this->getRegionsFromMonitorInfo(monitor).size() > 0) {
+                            this->focusLocation(this->getRegionsFromMonitorInfo(monitor).back(), NULL);
+                        }
+                        else {
+                            this->focusLocation(NULL, monitor);
+                        }
                     }
-                    break;
+                    break;*/
                 }
             }
         }
@@ -1112,7 +1142,8 @@ namespace lib {
 
     bool DoorsWindowManager::moveMouse(int x, int y) {
         if (this->mIsAdmin) {
-            SetCursorPos(x, y);
+            SetCursorPos(y, x);
+            std::cout << "moved mouse to " << x << " , " << y << std::endl;
             return true;
         }
         else {
