@@ -43,21 +43,41 @@ namespace lib
 
 				auto windowManager = globalKeyboardListener->mDwm;
 				
-				if (isitSet(keysPressed, K_KEY) && isitSet(keysPressed, VK_LWIN) && isitSet(keysPressed, VK_LSHIFT)) {
+				// Define the masks for the specific keys we care about
+				u_int K_WIN_SHIFT_MASK = (1 << (K_KEY % (sizeof(int) * 8))) | (1 << (VK_LWIN % (sizeof(int) * 8))) | (1 << (VK_LSHIFT % (sizeof(int) * 8)));
+				u_int K_WIN_MASK = (1 << (K_KEY % (sizeof(int) * 8))) | (1 << (VK_LWIN % (sizeof(int) * 8)));
+				u_int J_WIN_SHIFT_MASK = (1 << (J_KEY % (sizeof(int) * 8))) | (1 << (VK_LWIN % (sizeof(int) * 8))) | (1 << (VK_LSHIFT % (sizeof(int) * 8)));
+				u_int J_WIN_MASK = (1 << (J_KEY % (sizeof(int) * 8))) | (1 << (VK_LWIN % (sizeof(int) * 8)));
+
+				// Check if exactly the keys in K_WIN_SHIFT_MASK are pressed (no extra keys)
+				if ((keysPressed & K_WIN_SHIFT_MASK) == K_WIN_SHIFT_MASK && (keysPressed & ~K_WIN_SHIFT_MASK) == 0)
+				{
 					std::cout << "Sending Move Region to right!" << std::endl;
 					windowManager->shiftRegionToDirection(windowManager->getFocus(), lib::Direction::right);
-				} else if (isitSet(keysPressed, K_KEY) && isitSet(keysPressed, VK_LWIN)) {
+					return 1;
+				}
+				// Check if exactly the keys in K_WIN_MASK are pressed (no extra keys)
+				else if ((keysPressed & K_WIN_MASK) == K_WIN_MASK && (keysPressed & ~K_WIN_MASK) == 0)
+				{
 					std::cout << "Sending Move Focus to Right!" << std::endl;
 					windowManager->shiftFocusToDirection(lib::Direction::right);
+					return 1;
 				}
-				else if (isitSet(keysPressed, J_KEY) && isitSet(keysPressed, VK_LWIN) && isitSet(keysPressed, VK_LSHIFT)) {
+				// Check if exactly the keys in J_WIN_SHIFT_MASK are pressed (no extra keys)
+				else if ((keysPressed & J_WIN_SHIFT_MASK) == J_WIN_SHIFT_MASK && (keysPressed & ~J_WIN_SHIFT_MASK) == 0)
+				{
 					std::cout << "Sending Move Region to left!" << std::endl;
 					windowManager->shiftRegionToDirection(windowManager->getFocus(), lib::Direction::left);
+					return 1;
 				}
-				else if (isitSet(keysPressed, J_KEY) && isitSet(keysPressed, VK_LWIN)) {
+				// Check if exactly the keys in J_WIN_MASK are pressed (no extra keys)
+				else if ((keysPressed & J_WIN_MASK) == J_WIN_MASK && (keysPressed & ~J_WIN_MASK) == 0)
+				{
 					std::cout << "Sending Move Focus to left!" << std::endl;
 					windowManager->shiftFocusToDirection(lib::Direction::left);
-				} 
+					return 1;
+				}
+
 
 			
 			
