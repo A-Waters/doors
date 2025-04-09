@@ -23,7 +23,7 @@ newaction {
     description = "Build and run the project",
     execute = function ()
         -- Generate Visual Studio project files using Premake
-        os.execute("premake5.exe vs2022")
+        -- os.execute("premake5.exe vs2022")
         
         local build_command = string.format(
             '"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\MSBuild\\Current\\Bin\\amd64\\MSBuild.exe" doors.sln /p:Configuration=Debug /p:Platform=x64'

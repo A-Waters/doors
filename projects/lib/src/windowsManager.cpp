@@ -5,6 +5,9 @@
 // Structure to hold window information
 
 namespace lib {
+
+    DoorsWindowManager* globalDoorManager;
+
     void LogError(const char* functionName, HWND hwnd, int x, int y, int width, int height) {
         DWORD err = GetLastError();
         if (err) {
@@ -27,6 +30,26 @@ namespace lib {
             // Free the buffer allocated by FormatMessage
             LocalFree(msgBuffer);
         }
+    }
+
+
+    LRESULT CALLBACK onWindowCreateCallback(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+        switch (msg) {
+        case WM_CREATE:
+            // Window created, trigger the callback
+            globalDoorManager->loadWindowInfo();
+            globalDoorManager->loadMonitorInfo();
+            globalDoorManager->buildRegions();
+            break;
+
+        case WM_DESTROY:
+            PostQuitMessage(0);
+            break;
+
+        default:
+            return DefWindowProc(hwnd, msg, wParam, lParam);
+        }
+        return  DefWindowProc(hwnd, msg, wParam, lParam);;
     }
 
     // Callback function to enumerate windows
@@ -101,6 +124,8 @@ namespace lib {
         return isElevated == TRUE;
     }
 
+
+
     bool DoorsWindowManager::buildRegions()
     {
         // not gonna work when deleting regions and then adding one back as we base the id on the size of the arr meaning there can be multiple regions with the same ID;
@@ -160,7 +185,7 @@ namespace lib {
         std::vector<Region*> removedRegions;
         std::vector<Region*>& regions = mRegions[monitor->mMonitorHandle];
 
-        std::cout << " =================================== " << monitor->mMonitorHandle << " =================================== " << std::endl;
+        std::cout << "calling calculateRegionsForMonitor : " << monitor->mMonitorHandle << std::endl;
 
         if (regions.empty()) {
             std::cerr << "No regions to process!" << std::endl;
@@ -177,7 +202,7 @@ namespace lib {
         int usableWidth = workAreaWidth - 2 * sideGaps;  // minus left and right side gaps
         int usableHeight = workAreaHeight - topGap - botGap;  // minus top and bottom gaps
 
-        std::cout << "Usable Area Dimensions: Width = " << usableWidth << ", Height = " << usableHeight << std::endl;
+        //  std::cout << "Usable Area Dimensions: Width = " << usableWidth << ", Height = " << usableHeight << std::endl;
 
         // Edge Case: Handle negative or zero usable area
         if (usableHeight <= 0 || usableWidth <= 0) {
@@ -233,19 +258,19 @@ namespace lib {
                     totalExtraWidth += regionMinWidth;
                     allSmallerThanBaseline = false;
                 }
-                std::cout << "REGION min size for " << region->DWI->title << " | Min Width = " << regionMinWidth << std::endl;
+                // std::cout << "REGION min size for " << region->DWI->title << " | Min Width = " << regionMinWidth << std::endl;
             }
 
             if (allSmallerThanBaseline) {
-                std::cout << "------------Case: All regions smaller than baseline--------------" << std::endl;
+                // std::cout << "------------Case: All regions smaller than baseline--------------" << std::endl;
                 for (Region* region : regions) {
                     region->mWidth = sizePerRegionBaseline;
-                    std::cout << "Adjusted width for region: " << region->DWI->title << " | Width = " << region->mWidth << std::endl;
+                    // std::cout << "Adjusted width for region: " << region->DWI->title << " | Width = " << region->mWidth << std::endl;
                 }
             }
             else {
                 int remainingSpace = usableWidth - totalMinWidth - totalExtraWidth;
-                std::cout << "Remaining space: " << remainingSpace << std::endl;
+                // std::cout << "Remaining space: " << remainingSpace << std::endl;
 
                 if (remainingSpace > 0 && numberOfSmallerRegions > 0) {
                     int spacePerSmallerRegion = remainingSpace / numberOfSmallerRegions;
@@ -254,7 +279,7 @@ namespace lib {
                         int regionMinWidth = region->DWI->minSizes.ptMinTrackSize.x;
                         if (regionMinWidth < sizePerRegionBaseline) {
                             region->mWidth = regionMinWidth + spacePerSmallerRegion;
-                            std::cout << "Adjusted width for smaller region: " << region->DWI->title << " | Width = " << region->mWidth << std::endl;
+                            // std::cout << "Adjusted width for smaller region: " << region->DWI->title << " | Width = " << region->mWidth << std::endl;
                         }
                         else {
                             region->mWidth = regionMinWidth;  // Keep regions larger than baseline at their min size
@@ -296,7 +321,7 @@ namespace lib {
             region->mX = nextXStart;
             region->mHeight = usableHeight;
 
-            std::cout << "Assigned position to " << region->DWI->title << " | X = " << region->mX << ", Y = " << region->mY << ", Width = " << region->mWidth << ", Height = " << region->mHeight << std::endl;
+           // std::cout << "Assigned position to " << region->DWI->title << " | X = " << region->mX << ", Y = " << region->mY << ", Width = " << region->mWidth << ", Height = " << region->mHeight << std::endl;
 
             nextXStart = region->mX + region->mWidth + innerGap;
         }
@@ -320,13 +345,13 @@ namespace lib {
         for (const auto& pair : this->mRegions) {
             std::vector<Region*> regionsForWindow = pair.second;
             for (Region* region : regionsForWindow) {
-                std::cout << "moving to match regions " << region->DWI->title
+                /*std::cout << "moving to match regions " << region->DWI->title
                     << " With ID [" << region->id
                     << "] to (" << region->mX
                     << ", " << region->mY
                     << ") with size of (" 
                     << region->mWidth << ","
-                    << region->mHeight << ")\n";
+                    << region->mHeight << ")\n";*/
 
                 // add a check to check if full screen or minmized and then undoit if requreid
                 // SetWindowLongPtr(region->DWI->hwnd, GWLP_WNDPROC, (LONG_PTR)WindowProc);
@@ -340,6 +365,7 @@ namespace lib {
                 
             }
         };
+        printInfo();
         return true;
     }
 
@@ -351,61 +377,29 @@ namespace lib {
     // Constructor for windowManger
     DoorsWindowManager::DoorsWindowManager() {
 
-
+        globalDoorManager = this;
         this->mIsAdmin = isRunningAsAdmin();
         this->loadWindowInfo();
         this->loadMonitorInfo();       
         this->buildRegions();
-        // matchWindowsToRegions();
-        
-        /*this->moveMouse(100, 100);
-        this->buildRegions();
-        matchWindowsToRegions();
-        printf("====================== waiting ===================== \n");
-        Sleep(2000);
-        // Remove the keyboard hook
-        if (mActiveMonitors.size() >= 2) {
-            
-            HMONITOR fromMonitor = mActiveMonitors[0]->mMonitorHandle;  // First monitor
-            HMONITOR toMonitor = mActiveMonitors[1]->mMonitorHandle;    // Second monitor
+        this->matchWindowsToRegions();
 
-            // Find a region associated with the first monitor (just an example)
-            if (!mRegions[fromMonitor].empty()) {
-                printf("====================== MOIVING ONE ===================== \n");
-                
-                Region* regionToMove = mRegions[fromMonitor][0];  // Assume first region on the first monitor
-                focusRegion(regionToMove);
-                // Move this region to the second monitor
-                bool result = moveRegionToMonitor(fromMonitor, toMonitor, regionToMove);
+        Sleep(1000);
 
-                if (result) {
-                    std::cout << "Region moved successfully!" << std::endl;
-                }
-                else {
-                    std::cout << "Failed to move region!" << std::endl;
-                }
-
-                
-                /*printf("GET READY\n");
-                Sleep(3);
-                shiftRegionToDirection(regionToMove, DoorsWindowManager::left);
-                matchWindowsToRegions();
-                Sleep(3);
-                shiftRegionToDirection(regionToMove, DoorsWindowManager::right);
-                matchWindowsToRegions();
-                Sleep(3);
-                shiftRegionToDirection(regionToMove, DoorsWindowManager::down);
-                matchWindowsToRegions();
-                Sleep(3);
-                shiftRegionToDirection(regionToMove, DoorsWindowManager::up);
-                matchWindowsToRegions();
-                
+        for (DoorMonitorInfo* monitor : this->mActiveMonitors) {
+            if (this->mRegions[monitor->mMonitorHandle].size() > 0) {
+                std::cout << "init focuing region : " << this->mRegions[monitor->mMonitorHandle].at(0)->DWI->title << std::endl;
+                focusLocation(this->mRegions[monitor->mMonitorHandle].at(0), NULL);
+                break;
             }
         }
-        matchWindowsToRegions();*/
-        
 
-        // this->swapRegionsByID(3, 4);
+        if (this->mFocusedRegion == NULL) {
+            if (this->mActiveMonitors.size() > 0) {
+                std::cout << "init focuing Monitor : " << this->mActiveMonitors.at(0) << std::endl;
+                focusLocation(NULL, this->mActiveMonitors.at(0));
+            }
+        }
     }
 
     DoorsWindowManager::~DoorsWindowManager()
@@ -466,17 +460,35 @@ namespace lib {
       return true;
     }
 
-    bool DoorsWindowManager::focusRegion(Region* regionToFocus)
+    bool DoorsWindowManager::focusLocation(Region* regionToFocus, DoorMonitorInfo* monitorToFocus)
     {
-        SetFocus(regionToFocus->DWI->hwnd);
-        
-        DWORD error = GetLastError();
-        if (error) {
+        if (regionToFocus == NULL && monitorToFocus == NULL) {
             return false;
         }
-        highlightRegion(regionToFocus);
-        this->mFocused = regionToFocus;
-        return true;
+
+        if (regionToFocus != NULL) {
+            std::cout << "now Focusing Region : " << regionToFocus->DWI->title << std::endl;
+            // SetForegroundWindow(regionToFocus->DWI->hwnd);
+            // SetFocus(regionToFocus->DWI->hwnd);
+
+            DWORD error = GetLastError();
+            if (error) {
+                return false;
+            }
+            // highlightRegion(regionToFocus);
+            this->mFocusedRegion = regionToFocus;
+            this->mFocusedMonitor = NULL;
+            return true;
+        }
+        else if (monitorToFocus != NULL) {
+            std::cout << "now Focusing Monitor !" << std::endl;
+            // SetFocus(NULL);
+
+            this->mFocusedMonitor = monitorToFocus;
+            this->mFocusedRegion = NULL;
+            this->moveMouse((mFocusedMonitor->mMonitorInfo.rcMonitor.left + mFocusedMonitor->mMonitorInfo.rcMonitor.right) / 2, (mFocusedMonitor->mCords->top + mFocusedMonitor->mCords->bottom) / 2);
+
+        }       
     }
 
     MINMAXINFO DoorsWindowManager::getSizeConstrains(HWND hwnd)
@@ -485,8 +497,7 @@ namespace lib {
         // Send the WM_GETMINMAXINFO message to the window to retrieve the min size
         SendMessage(hwnd, WM_GETMINMAXINFO, 0, (LPARAM)&minMaxInfo);
 
-        std::cout << minMaxInfo.ptMinTrackSize.x << std::endl;
-        std::cout << minMaxInfo.ptMinTrackSize.y << std::endl;
+        
         // check for bad numbers i.e. -858993460?
         if (minMaxInfo.ptMinTrackSize.x > 2000) {
             minMaxInfo.ptMinTrackSize.x = 2000;
@@ -534,6 +545,11 @@ namespace lib {
         // SetWindowPos(regionToHighlight->DWI->hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOREPOSITION | SWP_NOSIZE);
     }
 
+    std::vector<DoorsWindowManager::Region*> DoorsWindowManager::getRegionsFromMonitorInfo(const DoorsWindowManager::DoorMonitorInfo* dmi)
+    {
+        return (this->mRegions[dmi->mMonitorHandle]);
+    }
+
     DoorsWindowManager::WindowType DoorsWindowManager::GetWindowType(HWND hwnd)
     {
         // Retrieve window styles
@@ -545,7 +561,7 @@ namespace lib {
             return Popup;
         }
 
-        std::cout << "Style = " << dwStyle << " Exstyle = " << dwExStyle << std::endl;
+        // std::cout << "Style = " << dwStyle << " Exstyle = " << dwExStyle << std::endl;
         // Check for a MessageBox - These are special modal windows
         // You could also check if the window is a child of the MessageBox class
         wchar_t className[512];
@@ -666,7 +682,7 @@ namespace lib {
         return false;
     }
 
-    bool DoorsWindowManager::moveRegionToMonitor(HMONITOR from, HMONITOR to, Region* regionToMove) {
+    bool DoorsWindowManager::moveRegionToMonitor(HMONITOR from, HMONITOR to, Region* regionToMove, Direction dir) {
         
         // if you have gone clinicically insane 
         if (mActiveMonitors.size() < 2) {
@@ -686,7 +702,7 @@ namespace lib {
         }
 
         // Safe logging if DWI is valid
-        std::cout << "Moving region " << regionToMove->id << " (" << regionToMove->DWI->title.c_str() << ") from monitor " << from << " to monitor " << to << std::endl;
+        std::cout << "Moving region " << regionToMove->DWI->title.c_str() << "from monitor " << from << " to monitor " << to << std::endl;
 
         // Check if the 'from' and 'to' monitors exist in the map
         auto fromIt = this->mRegions.find(from);
@@ -718,13 +734,27 @@ namespace lib {
             fromMonitor.erase(foundRegion);
 
             // bad preformance but its C so
-            toMonitor.insert(toMonitor.begin(), regionToMove);
-
-            std::cout << "Successfully moved region " << regionToMove->id << " to monitor " << to << std::endl;
+            switch (dir)
+            {
+            case lib::left:
+                toMonitor.insert(toMonitor.end(), regionToMove);
+                break;
+            case lib::right:
+                toMonitor.insert(toMonitor.begin(), regionToMove);
+                break;
+            case lib::up:
+                break;
+            case lib::down:
+                break;
+            default:
+                break;
+            }  
+            regionToMove->DWI->monitorHandle = to;
+            std::cout << "Successfully moved region " << regionToMove->DWI->title.c_str() << " to monitor " << to << std::endl;
             return true; // Return true to indicate success
         }
         else {
-            std::cout << "Failed to find region " << regionToMove->id << " on monitor " << from << std::endl;
+            std::cout << "Failed to find region " << regionToMove->DWI->title.c_str() << " on monitor " << from << std::endl;
             return false; // Return false if the region wasn't found
         }
     }
@@ -737,6 +767,7 @@ namespace lib {
         
         DoorMonitorInfo* currentMonitorInfo = getMonitorInfoFromMonitorHandle(region->DWI->monitorHandle);
         if (!currentMonitorInfo) {
+            std::cout << "no monitor found" << std::endl;
             return false;  // Failed to get monitor info
         }
 
@@ -746,6 +777,7 @@ namespace lib {
         // Find the index of the region to shift
         auto it = std::find(regions.begin(), regions.end(), region);
         if (it == regions.end()) {
+            std::cout << "region index not found" << std::endl;
             return false;  // Region not found in the monitor's region list
         }
 
@@ -759,22 +791,40 @@ namespace lib {
         case left:
             if (currentIndex > 0) {
                 // Swap the region with the one on the left
+                std::cout << "simple swap" << std::endl;
                 swapRegions(regions[currentIndex], regions[currentIndex - 1]);
-                shifted = true;
+                focusLocation(regions[currentIndex - 1], NULL);
+                
             }
             else {
                 // No region to the left on the current monitor, check next monitor
-                DoorMonitorInfo* leftMonitor = nullptr;
-                for (size_t i = 0; i < mActiveMonitors.size(); ++i) {
-                    if (mActiveMonitors[i] == currentMonitorInfo && i > 0) {
-                        leftMonitor = mActiveMonitors[i - 1]; // Get monitor to the left
-                        break;
+                DoorMonitorInfo* foundMonitor = nullptr;
+                for (DoorMonitorInfo* monitor : this->mActiveMonitors) {
+                    // if there is a monitor on the left side
+                    if (monitor->mMonitorInfo.rcMonitor.left < currentMonitorInfo->mMonitorInfo.rcMonitor.left) {
+
+                        // check if its closer
+                        if (foundMonitor == nullptr) {
+                            std::cout << "first found monitor distance: " << monitor->mMonitorInfo.rcMonitor.left - currentMonitorInfo->mMonitorInfo.rcMonitor.left << std::endl;
+
+                            foundMonitor = monitor;
+                        }
+                        else if (
+                            (monitor->mMonitorInfo.rcMonitor.left - currentMonitorInfo->mMonitorInfo.rcMonitor.left)
+                                >
+                            (foundMonitor->mMonitorInfo.rcMonitor.left - currentMonitorInfo->mMonitorInfo.rcMonitor.left)
+                            ) {
+                            std::cout << "new found monitor distance: " << monitor->mMonitorInfo.rcMonitor.left - currentMonitorInfo->mMonitorInfo.rcMonitor.left << std::endl;
+                            foundMonitor = monitor;
+                        }
+
                     }
                 }
 
                 // If there is a monitor to the left, move the region there
-                if (leftMonitor) {
-                    shifted = moveRegionToMonitor(currentMonitorInfo->mMonitorHandle, leftMonitor->mMonitorHandle, region);
+                if (foundMonitor != nullptr) {
+                    shifted = moveRegionToMonitor(currentMonitorInfo->mMonitorHandle, foundMonitor->mMonitorHandle, region, dir);
+                    focusLocation(region, NULL);
                 }
             }
             break;
@@ -782,22 +832,41 @@ namespace lib {
         case right:
             if (currentIndex < regions.size() - 1) {
                 // Swap the region with the one on the right
+                std::cout << "simple swap" << std::endl;
                 swapRegions(regions[currentIndex], regions[currentIndex + 1]);
-                shifted = true;
+                focusLocation(regions[currentIndex + 1], NULL);
+                return true; // no need to re draw
             }
             else {
                 // No region to the right on the current monitor, check next monitor
-                DoorMonitorInfo* rightMonitor = nullptr;
-                for (size_t i = 0; i < mActiveMonitors.size(); ++i) {
-                    if (mActiveMonitors[i] == currentMonitorInfo && i < mActiveMonitors.size() - 1) {
-                        rightMonitor = mActiveMonitors[i + 1]; // Get monitor to the right
-                        break;
+                DoorMonitorInfo* foundMonitor = nullptr;
+                for (DoorMonitorInfo* monitor : this->mActiveMonitors) {
+                    // if there is a monitor on the right side
+
+                    if (monitor->mMonitorInfo.rcMonitor.right > currentMonitorInfo->mMonitorInfo.rcMonitor.right) {
+
+
+                        // check if its closer
+                        if (foundMonitor == nullptr) {
+                            foundMonitor = monitor;
+
+                        }
+                        else if (
+                            (monitor->mMonitorInfo.rcMonitor.right - currentMonitorInfo->mMonitorInfo.rcMonitor.right)
+                                                                    <
+                            (foundMonitor->mMonitorInfo.rcMonitor.right - currentMonitorInfo->mMonitorInfo.rcMonitor.right)
+                            ) 
+                        {
+                            foundMonitor = monitor;
+                            
+                        }
+
                     }
                 }
 
-                // If there is a monitor to the right, move the region there
-                if (rightMonitor) {
-                    shifted = moveRegionToMonitor(currentMonitorInfo->mMonitorHandle, rightMonitor->mMonitorHandle, region);
+                if (foundMonitor != nullptr) {
+                    shifted = moveRegionToMonitor(currentMonitorInfo->mMonitorHandle, foundMonitor->mMonitorHandle, region, dir);
+                    focusLocation(region, NULL);
                 }
             }
             break;
@@ -818,24 +887,202 @@ namespace lib {
         }
 
         // Return true if the region has been successfully shifted
+        if (shifted) {
+            matchWindowsToRegions();
+        }
         return shifted;
+    }
+
+    bool DoorsWindowManager::shiftFocusToDirection(Direction dir)
+    {
+        std::cout << "previous Region: " << ((this->mFocusedRegion != NULL) ? this->mFocusedRegion->DWI->title : "false") << std::endl;
+        std::cout << "previous Monitor: " << ((this->mFocusedMonitor != NULL) ? "true" : "false") << std::endl;
+        
+        int currentIndex;
+        std::vector<Region*> regions;
+        DoorMonitorInfo* currentMonitorInfo;
+        bool shifted = false;
+        
+        if (this->mFocusedRegion != NULL) {
+
+            std::cout << "mFocusedRegion is not null" << std::endl;
+            std::cout << "did not crash due to null focused region" << std::endl;
+
+            regions = mRegions[this->mFocusedRegion->DWI->monitorHandle];
+
+            currentMonitorInfo = getMonitorInfoFromMonitorHandle(this->mFocusedRegion->DWI->monitorHandle);
+            if (!currentMonitorInfo) {
+                std::cout << "unable to get monitor info" << std::endl;
+                return false;  // Failed to get monitor info
+            }
+
+            // Find the index of the region to shift
+            auto it = std::find(regions.begin(), regions.end(), this->mFocusedRegion);
+            if (it == regions.end()) {
+                std::cout << "unable to get region location" << std::endl;
+                return false;  // Region not found in the monitor's region list
+            }
+
+            // Get the current index of the region
+            currentIndex = std::distance(regions.begin(), it);
+
+            // Handle the shift direction
+            switch (dir) {
+            case left:
+                std::cout << "moving left" << std::endl;
+                if (currentIndex > 0) {
+                    // Swap the region with the one on the left
+                    this->focusLocation(regions[currentIndex - 1], NULL);
+                    shifted = true;
+                }
+                else
+                {
+                    DoorMonitorInfo* foundMonitor = nullptr;
+                    for (DoorMonitorInfo* monitor : this->mActiveMonitors) {
+                        // if there is a monitor on the left side
+                        if (monitor->mMonitorInfo.rcMonitor.left < currentMonitorInfo->mMonitorInfo.rcMonitor.left) {
+
+                            // check if its closer
+                            if (foundMonitor == nullptr) {
+                                std::cout << "first found monitor distance: "<< monitor->mMonitorInfo.rcMonitor.left - currentMonitorInfo->mMonitorInfo.rcMonitor.left << std::endl;
+                                
+                                foundMonitor = monitor;
+                            }
+                            else if (
+                                (monitor->mMonitorInfo.rcMonitor.left - currentMonitorInfo->mMonitorInfo.rcMonitor.left)
+                                >
+                                (foundMonitor->mMonitorInfo.rcMonitor.left - currentMonitorInfo->mMonitorInfo.rcMonitor.left)
+                                ) {
+                                std::cout << "new found monitor distance: " << monitor->mMonitorInfo.rcMonitor.left - currentMonitorInfo->mMonitorInfo.rcMonitor.left << std::endl;
+                                foundMonitor = monitor;
+                            }
+                            
+                        }
+                    }
+
+                    if (foundMonitor != nullptr) {
+                        std::vector<Region*> regionsOnMonitor = getRegionsFromMonitorInfo(foundMonitor);
+                        if (regionsOnMonitor.size() > 0) {
+                            this->focusLocation(regionsOnMonitor.back(), NULL);
+                        }
+                        else {
+                            this->focusLocation(NULL, foundMonitor);
+                        }
+                    }
+                }
+                break;
+            case right:
+                std::cout << "moving right" << std::endl;
+                if (currentIndex != (regions.size() - 1)) {
+                    std::cout << "moving to new region on same monitor of index " << currentIndex << std::endl;
+                    // Swap the region with the one on the right
+                    this->focusLocation(regions[currentIndex + 1], NULL);
+                    shifted = true;
+                }
+                else
+                {
+                    std::cout << "checking for monitor on right" << std::endl;
+                    DoorMonitorInfo* foundMonitor = nullptr;
+                    for (DoorMonitorInfo* monitor : this->mActiveMonitors) {
+                        // if there is a monitor on the right side
+                        
+                        if (monitor->mMonitorInfo.rcMonitor.right > currentMonitorInfo->mMonitorInfo.rcMonitor.right) {
+
+
+                            // check if its closer
+                            if (foundMonitor == nullptr) {
+                                foundMonitor = monitor;
+                            
+                            }
+                            else if (
+                                (monitor->mMonitorInfo.rcMonitor.right - currentMonitorInfo->mMonitorInfo.rcMonitor.right)
+                                <
+                                (foundMonitor->mMonitorInfo.rcMonitor.right - currentMonitorInfo->mMonitorInfo.rcMonitor.right)
+                                ) {
+                                foundMonitor = monitor;
+                            }
+
+                        }
+                    }
+
+                    if (foundMonitor != nullptr) {
+                        std::vector<Region*> regionsOnMonitor = getRegionsFromMonitorInfo(foundMonitor);
+                        if (regionsOnMonitor.size() > 0) {
+                            std::cout << "moving to front of regions on new monitors" << std::endl;
+                            this->focusLocation(regionsOnMonitor.front(), NULL);
+                        }
+                        else {
+                            std::cout << "moving new monitors" << std::endl;
+                            this->focusLocation(NULL, foundMonitor);
+                        }
+                    }
+                    else {
+                        std::cout << "No new monitor found" << std::endl;
+                    }
+                }
+
+            }
+
+
+        }
+
+        // cant get to regions if a monitor is focused
+        else if (this->mFocusedMonitor != NULL) {
+            std::cout << "A monitor is currently focused" << std::endl;
+            for (DoorMonitorInfo* monitor : this->mActiveMonitors) {
+                switch (dir) {
+                case left:
+                    // if there is a monitor on the left side
+                    if (this->mFocusedMonitor->mMonitorInfo.rcMonitor.left > monitor->mMonitorInfo.rcMonitor.right) {
+                        this->focusLocation(NULL, monitor);
+                    }
+                    break;
+
+                case right:
+                    // if there is a monitor on the right side
+                    if (this->mFocusedMonitor->mMonitorInfo.rcMonitor.right < monitor->mMonitorInfo.rcMonitor.left) {
+                        this->focusLocation(NULL, monitor);
+                        break;
+                    }
+                    break;
+
+                case up:
+                    // if there is a monitor above (compare y-coordinate)
+                    if (this->mFocusedMonitor->mCords->top > monitor->mCords->bottom) {
+                        this->focusLocation(NULL, monitor);
+                        break;
+                    }
+                    break;
+
+                case down:
+                    // if there is a monitor below (compare y-coordinate)
+                    if (this->mFocusedMonitor->mCords->bottom < monitor->mCords->top) {
+                        this->focusLocation(NULL, monitor);
+                        break;
+                    }
+                    break;
+                }
+            }
+        }
     }
 
 
 
-    // Method to print out all windows stored
-    void DoorsWindowManager::printInfo() const {        
 
 
+    void DoorsWindowManager::printInfo() {
         std::cout << "---------------------------------INFO---------------------------------" << std::endl;
         std::cout << "Is Admin?: " << (this->mIsAdmin ? "yes" : "no") << std::endl;
+
         for (DoorMonitorInfo* monitor : this->mActiveMonitors) {
-            std::cout << "================= " << monitor->mMonitorHandle << " =================" << std::endl;
+            std::cout << "---------------------------------" << monitor->mMonitorHandle << "---------------------------------" << std::endl;
+            // Get the monitor handle
             HMONITOR mhand = monitor->mMonitorHandle;
 
-            // Safely find monitor regions for this monitor handle
+            // Access the vector of regions for the monitor handle
             auto it = this->mRegions.find(mhand);
             if (it != this->mRegions.end()) {
+                // Iterate through the regions
                 for (Region* region : it->second) {
                     if (region->DWI != nullptr) {
                         std::cout << "Window: " << region->DWI->title << " - Location: ("
@@ -858,7 +1105,9 @@ namespace lib {
     bool DoorsWindowManager::moveWindow(DoorWindowInfo* dwi, int x, int y, int width, int height)
     {
         // https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowpos
+
         return SetWindowPos(dwi->hwnd, HWND_TOP,x, y, width, height, SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS);
+        
     }
 
     bool DoorsWindowManager::moveMouse(int x, int y) {
@@ -871,6 +1120,8 @@ namespace lib {
         }
     }
 
-
+    DoorsWindowManager::Region* DoorsWindowManager::getFocus() {
+        return this->mFocusedRegion;
+    }
 
 }

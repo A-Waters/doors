@@ -8,19 +8,23 @@
 
 
 namespace lib {
+	
+	static LRESULT KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam);
+	
 
 	class KeyboardListener {
 		public:
-			KeyboardListener(DoorsWindowManager* dwm);	
+			
+			KeyboardListener(DoorsWindowManager* dwm);
 			// KeyboardListener(DoorsWindowManager dwm);
 			~KeyboardListener();
 		
 			// Initialize the keyboard listener (if needed)
 			void StartListening();
-
+			DoorsWindowManager* mDwm;
 		
 		private:
-			DoorsWindowManager* mDwm;
+
 			HHOOK keyboardHook;  // To hold the hook handle
 		};
 

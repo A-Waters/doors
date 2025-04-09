@@ -6,16 +6,33 @@
 
 namespace lib
 {
+	u_int keysPressed = 0;
+	int Q_KEY = 0x51;
+	int J_KEY = 0x4A;
+	int K_KEY = 0x4B;
+
+	bool isitSet(int number, int index) {
+		int mask = 1 << index;
+		// Use bitwise AND to check if both bits are set
+		return ((number & mask) != 0);
+	}
+	
+	// Static pointer to DoorsWindowManager
+	static KeyboardListener* globalKeyboardListener = nullptr;
 
 	static LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
 	{
+
+		
 		if (nCode == HC_ACTION)
 		{
 			KBDLLHOOKSTRUCT *pKey = (KBDLLHOOKSTRUCT *)lParam;
 
 			if (wParam == WM_KEYDOWN)
 			{
-				std::cout << "Key pressed: " << pKey->vkCode << std::endl;
+				keysPressed = keysPressed | (1 << pKey->vkCode);
+
+				std::cout << "Key pressed: " << keysPressed << std::endl;
 
 				// Check if the key pressed is 'q' (virtual key code for 'q' is 0x51)
 				if (pKey->vkCode == 0x51)
@@ -23,18 +40,43 @@ namespace lib
 					std::cout << "'q' key pressed!" << std::endl;
 					PostQuitMessage(0);
 				}
+
+				auto windowManager = globalKeyboardListener->mDwm;
+				
+				if (isitSet(keysPressed, K_KEY) && isitSet(keysPressed, VK_LWIN) && isitSet(keysPressed, VK_LSHIFT)) {
+					std::cout << "Sending Move Region to right!" << std::endl;
+					windowManager->shiftRegionToDirection(windowManager->getFocus(), lib::Direction::right);
+				} else if (isitSet(keysPressed, K_KEY) && isitSet(keysPressed, VK_LWIN)) {
+					std::cout << "Sending Move Focus to Right!" << std::endl;
+					windowManager->shiftFocusToDirection(lib::Direction::right);
+				}
+				else if (isitSet(keysPressed, J_KEY) && isitSet(keysPressed, VK_LWIN) && isitSet(keysPressed, VK_LSHIFT)) {
+					std::cout << "Sending Move Region to left!" << std::endl;
+					windowManager->shiftRegionToDirection(windowManager->getFocus(), lib::Direction::left);
+				}
+				else if (isitSet(keysPressed, J_KEY) && isitSet(keysPressed, VK_LWIN)) {
+					std::cout << "Sending Move Focus to left!" << std::endl;
+					windowManager->shiftFocusToDirection(lib::Direction::left);
+				} 
+
+			
+			
 			}
 			else if (wParam == WM_KEYUP)
 			{
+				keysPressed = keysPressed & ~(1 << pKey->vkCode);
 				std::cout << "Key released: " << pKey->vkCode << std::endl;
 			}
+
 		}
+		std::cout << "---------------------------------------------------------" << std::endl;
 		return CallNextHookEx(NULL, nCode, wParam, lParam);
 	}
 
 	KeyboardListener::KeyboardListener(DoorsWindowManager* dwm) : keyboardHook(nullptr)
 	{
 		this->mDwm = dwm;
+		globalKeyboardListener = this;
 	}
 
 	KeyboardListener::~KeyboardListener()

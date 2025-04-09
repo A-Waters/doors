@@ -51,16 +51,17 @@
 
 
 namespace lib {
-   
+    
+    enum Direction {
+        left,
+        right,
+        up,
+        down,
+    };
 
     class DoorsWindowManager {
 
-        enum Direction {
-            left,
-            right,
-            up,
-            down,
-        };
+        
 
 
         enum WindowType {
@@ -112,42 +113,49 @@ namespace lib {
         bool _addMonitorToWM(HMONITOR monitorHandle, HDC deviceContextHandle, LPRECT cords);
         DoorsWindowManager();
         ~DoorsWindowManager();
-        void printInfo() const;
+        void printInfo();
         bool moveWindow(DoorWindowInfo* dwi, int x, int y, int width, int height);
         bool moveMouse(int x, int y);
+        Region* getFocus();
         // DoorsWindowManager::Region* getRegionByWindowHandle(HWND hwnd);
         bool shiftRegionToDirection(Region* region, Direction dir);
+        bool shiftFocusToDirection(Direction dir);
+
         bool swapRegionsByID(int regionAid, int regionBid);
         bool swapRegions(Region* regionA, Region* regionB);
         bool createRegion(HMONITOR monitor, int x, int y, int length, int height, DoorWindowInfo* dwi);
         bool deleteRegion(HMONITOR monitor, Region* regionToRemove);
         // bool moveRegion(HMONITOR from, HMONITOR to, Region* regionToMove);
-        bool moveRegionToMonitor(HMONITOR from, HMONITOR to, Region* regionToMove);
+        bool moveRegionToMonitor(HMONITOR from, HMONITOR to, Region* regionToMove, Direction dir);
+        bool loadMonitorInfo();
+        bool loadWindowInfo();
+        bool buildRegions();
 
     private:
-        Region* mFocused;
-        int sideGaps = 10;
-        int topGap = 10;
-        int botGap = 10;
-        int innerGap = 10;
+        DoorMonitorInfo* mFocusedMonitor;
+        Region* mFocusedRegion;
+        int sideGaps = 20;
+        int topGap = 20;
+        int botGap = 20;
+        int innerGap = 20;
         std::vector <DoorWindowInfo*> mActiveWindows;
         std::vector <DoorMonitorInfo*> mActiveMonitors;
         std::map<HMONITOR, std::vector<Region*>> mRegions;
 
         bool mIsAdmin;
-        bool loadMonitorInfo();
-        bool loadWindowInfo();
+
         bool isRunningAsAdmin();
-        bool buildRegions();
+
         DoorMonitorInfo* getMonitorInfoFromMonitorHandle(HMONITOR monitorHandle);
         std::vector<Region*> calculateRegionsForMonitor(DoorMonitorInfo* monitor);
 
         bool matchWindowsToRegions();
         Region* getRegionsByID(int regionAid);
-        bool focusRegion(Region* regionToFocus);
+        bool focusLocation(Region* regionToFocus, DoorMonitorInfo* monitorToFocus);
         MINMAXINFO getSizeConstrains(HWND hwnd);
         WindowType GetWindowType(HWND hwnd);
         void highlightRegion(Region* regionToHighlight);
+        std::vector<Region*> getRegionsFromMonitorInfo(const DoorMonitorInfo* handle);
 
     };
     
